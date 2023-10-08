@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "start:both": "concurrently \"npm --prefix frontend start\" \"npm --prefix backend start\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "nodemon": "^3.0.1"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "styled-components": "^6.0.7"
+  }
+}
