@@ -10,13 +10,13 @@ const capitalizeFirstLetter = (str) => {
 const CustomTable = ({ data, filterData, title, onEdit, onDelete }) => {
 
   return (
-    <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '16px' }}>
-       <Paper elevation={6} sx={{ width: '80%', textAlign: 'center', marginBottom: '8px', padding: '16px', backgroundColor: 'darkblue' }}>
-        <Typography variant="h6" gutterBottom style={{ color: 'white' }}>
+    <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '16px', width: '100%'}}>
+       <Paper elevation={6} sx={{ width: '95%', textAlign: 'center', marginBottom: '8px', padding: '16px' }}>
+        <Typography variant="h6" gutterBottom sx={{fontWeight: 'bold'}} >
           {title}
         </Typography>
       </Paper>
-      <Paper elevation={3} sx={{ width: '80%', overflowX: 'auto' }}>
+      <Paper elevation={3} sx={{ width: '95%', overflowX: 'auto' }}>
         <TableContainer component={Paper} sx={{ minWidth: 300, width: '100%', margin: '0 auto' }}>
           <Table>
             <TableHead>

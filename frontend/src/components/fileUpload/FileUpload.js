@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Box, Typography, Button, FormControl, InputLabel, Select, MenuItem, TextField } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Papa from 'papaparse';
+import CustomTable from '../common/CustomTable';
+
 
 const StyledTitle = styled(Typography)(({ theme }) => ({
     color: 'white',
@@ -12,7 +14,7 @@ const StyledTitle = styled(Typography)(({ theme }) => ({
     textAlign: 'center',
     width: '95%',
     marginBottom: '26px',
-    boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.6)', 
+    boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.6)',
 }));
 
 const ContentWrapper = styled(Box)(({ theme }) => ({
@@ -24,7 +26,7 @@ const ContentWrapper = styled(Box)(({ theme }) => ({
     padding: '20px',
     boxSizing: 'border-box',
     marginTop: '10px',
-    boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.3)', 
+    boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.3)',
 }));
 
 const ButtonContainer = styled(Box)(({ theme }) => ({
@@ -37,9 +39,29 @@ const ButtonSpacer = styled(Box)(({ theme }) => ({
     marginLeft: '16px',
 }));
 
-const mlMethods = ['Method A', 'Method B', 'Method C'];
+const mlMethods = ['OLS', 'LASSO', 'RIDGE'];
 const depVars = ['Variable 1', 'Variable 2', 'Variable 3'];
 const independentVars = ['IndepVar 1', 'IndepVar 2', 'IndepVar 3'];
+
+const predictionResults = [
+    { id: 1, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+    { id: 2, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+    { id: 3, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+    { id: 4, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+    { id: 5, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+    { id: 6, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+    { id: 7, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+    { id: 8, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+    { id: 9, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+    { id: 10, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+    { id: 11, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+    { id: 12, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+    { id: 13, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+    { id: 14, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+    { id: 15, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+    { id: 16, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+];
+
 
 const FileUpload = () => {
     const [selectedFile, setSelectedFile] = useState(null);
@@ -47,8 +69,8 @@ const FileUpload = () => {
     const [dependentVariable, setDependentVariable] = useState('');
     const [independentVariables, setIndependentVariables] = useState([]);
     const [predictionResult, setPredictionResult] = useState([]);
+    const [showPredictResult, setShowPredictResult] = useState(false);
     const fileInputRef = useRef(null);
-
     const handleFileChange = (event) => {
         const file = event.target.files[0];
         setSelectedFile(file);
@@ -71,15 +93,18 @@ const FileUpload = () => {
     };
 
     const handlePredict = () => {
-        console.log(machineLearningMethod, dependentVariable, independentVariables, 'model inputs')
+        setPredictionResult(predictionResults);
+        setShowPredictResult(true);
     };
 
     const handleClear = () => {
         setMachineLearningMethod([]);
         setDependentVariable([]);
         setIndependentVariables([]);
+        setShowPredictResult(false);
     };
 
+    const filterData = []
     return (
         <Box
             display="flex"
@@ -87,6 +112,7 @@ const FileUpload = () => {
             alignItems="center"
             justifyContent="flex-start"
             height="80vh"
+            flex={1} 
             padding="20px"
             boxSizing="border-box"
         >
@@ -142,7 +168,7 @@ const FileUpload = () => {
                     <FormControl style={{ marginLeft: '16px' }}>
                         <InputLabel>Independent Variables</InputLabel>
                         <Select
-                            multiple  
+                            multiple
                             value={independentVariables}
                             onChange={(e) => setIndependentVariables(e.target.value)}
                             style={{ minWidth: '200px' }}
@@ -178,6 +204,12 @@ const FileUpload = () => {
                     </Button>
                 </ButtonContainer>
             </ContentWrapper>
+            {showPredictResult && machineLearningMethod &&
+                <CustomTable data={predictionResult}
+                    filterData={filterData}
+                    title={machineLearningMethod + ' Results'}
+
+                />}
         </Box>
     );
 };
