@@ -13,6 +13,7 @@ import Profile from './components/common/Profile';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import MobileMenu from './routes/MobileMenu';
 import HomePage from './components/HomePage';
+import FileUpload from './components/fileUpload/FileUpload';
 
 const App = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -27,7 +28,7 @@ const App = () => {
   };
 
   const authHandler = (data) => {
-    setState(prev=>({...prev, ...data}));
+    setState(prev => ({ ...prev, ...data }));
   };
   return (
     <>
@@ -65,10 +66,6 @@ const App = () => {
               </Box>
               {state?.token && (
                 <>
-                  {/* <SearchInput /> */}
-                  <Typography variant="body2" style={{ color: 'white', marginLeft: '16px' }}>
-                    Balance: ${state.balance}
-                  </Typography>
                   <Box style={{ cursor: 'pointer' }}>
                     <Profile fullName={state.first_name + ' ' + state.last_name} onLogout={handleLogout} />
                   </Box>
@@ -78,14 +75,16 @@ const App = () => {
           </AppBar>
           {state?.token && <MobileMenu open={mobileMenuOpen} onClose={toggleMobileMenu} data={state} />}
 
-          {!state?.token ? (
+          {/* {!state?.token ? (
             <Box style={{ flex: 1, overflow: 'auto' }}>
               <HomePage authHandler={authHandler} />
             </Box>
           ) : (
             <Box style={{ flex: 1, overflow: 'auto' }} />
+          )} */}
+          {!state?.token && (
+            <FileUpload /> 
           )}
-
           <AppBar position="static">
             <Toolbar>
               <Typography variant="body2" align="center">
