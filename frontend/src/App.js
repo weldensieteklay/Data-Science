@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CssBaseline,
   AppBar,
@@ -30,16 +30,16 @@ const App = () => {
   const authHandler = (data) => {
     setState(prev => ({ ...prev, ...data }));
   };
+
   return (
-    <>
+    <Box>
       <CssBaseline />
       <ErrorBoundary>
         <Box
+          id="app-container"
           style={{
             display: 'flex',
             flexDirection: 'column',
-            minHeight: '100vh',
-            overflowX: 'hidden',
           }}
         >
           <AppBar position="static">
@@ -82,26 +82,28 @@ const App = () => {
           ) : (
             <Box style={{ flex: 1, overflow: 'auto' }} />
           )} */}
-          <Box sx={{marginBottom: 45}}> 
-          {!state?.token && (
-            <FileUpload />
-          )}
+          <Box>
+            {!state?.token && (
+              <FileUpload />
+            )}
           </Box >
-          <AppBar position="fixed" 
-            sx={{
-              top: 'auto',
-              bottom: 0,
-            }}
-          >
-            <Toolbar>
-              <Typography variant="body2" align="center">
-                © 2023 My App. All rights reserved.
-              </Typography>
-            </Toolbar>
-          </AppBar>
+
         </Box>
+        {/* <AppBar position="fixed"
+          sx={{
+            top: 'auto',
+            bottom: 0,
+          }}
+        >
+          <Toolbar>
+            <Typography variant="body2" align="center">
+              © 2023 My App. All rights reserved.
+            </Typography>
+          </Toolbar>
+        </AppBar> */}
+        
       </ErrorBoundary>
-    </>
+    </Box>
   );
 };
 
