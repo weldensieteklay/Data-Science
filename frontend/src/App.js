@@ -82,10 +82,17 @@ const App = () => {
           ) : (
             <Box style={{ flex: 1, overflow: 'auto' }} />
           )} */}
+          <Box sx={{marginBottom: 45}}> 
           {!state?.token && (
-            <FileUpload /> 
+            <FileUpload />
           )}
-          <AppBar position="static">
+          </Box >
+          <AppBar position="fixed" 
+            sx={{
+              top: 'auto',
+              bottom: 0,
+            }}
+          >
             <Toolbar>
               <Typography variant="body2" align="center">
                 © 2023 My App. All rights reserved.
