@@ -208,7 +208,22 @@ const FileUpload = () => {
               value={state.x}
               onChange={(e) => handleInputChange('x', e.target.value)}
               style={{ minWidth: '200px' }}
-              // renderValue={(selected) => selected.join(', ')}
+              MenuProps={{
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                },
+                transformOrigin: {
+                  vertical: 'top',
+                  horizontal: 'left',
+                },
+                getContentAnchorEl: null, 
+                PaperProps: {
+                  style: {
+                    maxHeight: '200px', 
+                  },
+                },
+              }}
               renderValue={() => (
                 <div>
                   {state.x.map((variable) => (
@@ -221,6 +236,7 @@ const FileUpload = () => {
                   ))}
                 </div>
               )}
+              
             >
               {state.independentVariables.map((variable) => (
                 <MenuItem key={variable} value={variable}>
