@@ -1,42 +1,42 @@
-import React, { useState, useRef } from 'react';
-import { Box, Typography, Button, FormControl, InputLabel, Select, MenuItem, TextField, Chip} from '@mui/material';
+import React, { useState, useRef, useEffect } from 'react';
+import { Box, Typography, Button, FormControl, InputLabel, Select, MenuItem, TextField, Chip } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Papa from 'papaparse';
+import axios from 'axios';
 import CustomTable from '../common/CustomTable';
 
-
 const StyledTitle = styled(Typography)(({ theme }) => ({
-    color: 'white',
-    margin: 0,
-    padding: '16px',
-    backgroundColor: 'darkblue',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    width: '95%',
-    marginBottom: '26px',
-    boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.6)',
+  color: 'white',
+  margin: 0,
+  padding: '16px',
+  backgroundColor: 'darkblue',
+  fontWeight: 'bold',
+  textAlign: 'center',
+  width: '95%',
+  marginBottom: '26px',
+  boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.6)',
 }));
 
 const ContentWrapper = styled(Box)(({ theme }) => ({
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '95%',
-    padding: '20px',
-    boxSizing: 'border-box',
-    marginTop: '10px',
-    boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.3)',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '95%',
+  padding: '20px',
+  boxSizing: 'border-box',
+  marginTop: '10px',
+  boxShadow: '0px 0px 5px rgba(0, 0, 0, 0.3)',
 }));
 
 const ButtonContainer = styled(Box)(({ theme }) => ({
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '16px',
+  display: 'flex',
+  justifyContent: 'center',
+  marginTop: '16px',
 }));
 
 const ButtonSpacer = styled(Box)(({ theme }) => ({
-    marginLeft: '16px',
+  marginLeft: '16px',
 }));
 
 const mlMethods = ['OLS', 'LASSO', 'RIDGE'];
@@ -44,33 +44,33 @@ const depVars = ['Variable 1', 'Variable 2', 'Variable 3'];
 const independentVars = ['IndepVar 1', 'IndepVar 2', 'IndepVar 3'];
 
 const predictionResults = [
-    { id: 1, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-    { id: 2, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-    { id: 3, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-    { id: 4, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-    { id: 5, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-    { id: 6, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-    { id: 7, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-    { id: 8, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-    { id: 9, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-    { id: 10, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-    { id: 11, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-    { id: 12, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-    { id: 13, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-    { id: 14, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-    { id: 15, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-    { id: 16, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-    { id: 17, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-    { id: 18, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-    { id: 19, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-    { id: 20, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-    { id: 21, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-    { id: 22, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-    { id: 23, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-    { id: 24, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-    { id: 25, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-    { id: 26, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-    { id: 27, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+  { id: 1, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+  { id: 2, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+  { id: 3, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+  { id: 4, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+  { id: 5, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+  { id: 6, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+  { id: 7, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+  { id: 8, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+  { id: 9, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+  { id: 10, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+  { id: 11, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+  { id: 12, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+  { id: 13, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+  { id: 14, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+  { id: 15, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+  { id: 16, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+  { id: 17, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+  { id: 18, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+  { id: 19, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+  { id: 20, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+  { id: 21, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+  { id: 22, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+  { id: 23, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+  { id: 24, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
+  { id: 25, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
+  { id: 26, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
+  { id: 27, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
 ];
 
 const initialState = {
@@ -80,62 +80,144 @@ const initialState = {
   independentVariables: [],
   predictionResult: [],
   showPredictResult: false,
+  id:'',
   y: '',
   x: [],
 };
 
 
+const openDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("IndexedDB", 1);
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      db.createObjectStore("csvFiles", { keyPath: "id", autoIncrement: true });
+    };
+
+    request.onsuccess = () => {
+      const db = request.result;
+      resolve(db);
+    };
+
+    request.onerror = (event) => {
+      reject(event.target.error);
+    };
+  });
+};
+
 const FileUpload = () => {
   const [state, setState] = useState(initialState);
   const fileInputRef = useRef(null);
 
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const file = event.target.files[0];
-    parseCSVFile(file);
+    const parsedData = await parseCSVFile(file);
+    saveToIndexedDB(parsedData);
   };
 
   const parseCSVFile = (file) => {
-    Papa.parse(file, {
-      complete: (result) => {
-        const parsedData = result.data || [];
-        const filteredData = parsedData.length>0 && parsedData.filter((row) =>
-          Object.values(row).every((value) => value !== undefined && value !== null && value !== '')
-        );
+    return new Promise((resolve) => {
+      Papa.parse(file, {
+        complete: (result) => {
+          const parsedData = result.data || [];
+          const filteredData = parsedData.length > 0 && parsedData.filter((row) =>
+            Object.values(row).every((value) => value !== undefined && value !== null && value !== '')
+          );
 
-        setState((prevState) => ({
-          ...prevState,
-          data: filteredData,
-          dependentVariable: Object.keys(filteredData[0]) || [],
-          independentVariables: Object.keys(filteredData[0]) || [],
-        }));
-      },
-      header: true,
+          setState((prevState) => ({
+            ...prevState,
+            data: filteredData,
+            dependentVariable: Object.keys(filteredData[0]) || [],
+            independentVariables: Object.keys(filteredData[0]) || [],
+          }));
+
+          resolve(filteredData);
+        },
+        header: true,
+      });
     });
   };
 
+  useEffect(() => {
+    const fetchDataFromIndexedDB = async () => {
+    const db = await openDB();
+    const transaction = db.transaction("csvFiles", "readonly");
+    const csvFileStore = transaction.objectStore("csvFiles");
+    const cursor = csvFileStore.openCursor();
+      cursor.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const parsedData = cursor.value.data;
+          setState((prevState) => ({
+            ...prevState,
+            data: parsedData,
+            dependentVariable: Object.keys(parsedData[0]) || [],
+            independentVariables: Object.keys(parsedData[0]) || [],
+          }));
+          cursor.continue();
+        }
+      };
+    };
+    fetchDataFromIndexedDB();
+  }, []);
+
+
+
+  const saveToIndexedDB = async (data) => {
+    const db = await openDB();
+    const transaction = db.transaction("csvFiles", "readwrite");
+    const csvFileStore = transaction.objectStore("csvFiles");
+    csvFileStore.add({ data });
+  };
+
   const handlePredict = () => {
+    const selectedData = state.data.map((row) => {
+      const rowData = {
+        [state.id]: row[state.id], 
+        [state.y]: row[state.y],
+      };
+      state.x.forEach((variable) => {
+        rowData[variable] = row[variable];
+      });
+      return rowData;
+    });
+    const data = JSON.stringify({data: selectedData});
     setState((prevState) => ({
       ...prevState,
       predictionResult: predictionResults,
       showPredictResult: true,
     }));
-  };
 
+    // axios.post(`http://localhost:5000/${state.machineLearningMethod}`, data)
+    // .then(response => {
+    //   setState((prevState) => ({
+    //     ...prevState,
+    //     predictionResult: response.data,
+    //     showPredictResult: true,
+    //   }));    
+    // })
+    // .catch(err => {
+    //     console.log(err, 'Error in predict');
+    // });
+  };
+  
   const handleInputChange = (name, value) => {
     setState((prevData) => ({
-        ...prevData,
-        [name]: value,
+      ...prevData,
+      [name]: value,
     }));
-};
+  };
   const handleClear = () => {
     setState((prevState) => ({
       ...prevState,
       y: '',
       x: [],
-    }));  };
+    }));
+  };
 
   const removeVariable = (variable) => {
-    const updatedX = state.x.filter((x) => x !== variable); 
+    const updatedX = state.x.filter((x) => x !== variable);
     setState((prevState) => ({
       ...prevState,
       x: updatedX,
@@ -186,10 +268,24 @@ const FileUpload = () => {
             </Select>
           </FormControl>
           <FormControl style={{ marginLeft: '16px' }}>
+            <InputLabel>Unique Identifier</InputLabel>
+            <Select
+              value={state.id}
+              onChange={(e) => handleInputChange('id', e.target.value)}
+              style={{ minWidth: '200px' }}
+            >
+              {state.dependentVariable.map((variable) => (
+                <MenuItem key={variable} value={variable}>
+                  {variable}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Dependent Variable</InputLabel>
             <Select
               value={state.y}
-              // onChange={(e) => setState({ ...state, y: e.target.value })}
               onChange={(e) => handleInputChange('y', e.target.value)}
               style={{ minWidth: '200px' }}
             >
@@ -217,10 +313,10 @@ const FileUpload = () => {
                   vertical: 'top',
                   horizontal: 'left',
                 },
-                getContentAnchorEl: null, 
+                getContentAnchorEl: null,
                 PaperProps: {
                   style: {
-                    maxHeight: '200px', 
+                    maxHeight: '200px',
                   },
                 },
               }}
@@ -231,12 +327,12 @@ const FileUpload = () => {
                       key={variable}
                       label={variable}
                       onDelete={() => removeVariable(variable)}
-                      onMouseDown={(e) => e.stopPropagation()}      
-                      />
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
                   ))}
                 </div>
               )}
-              
+
             >
               {state.independentVariables.map((variable) => (
                 <MenuItem key={variable} value={variable}>
