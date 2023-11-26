@@ -1,13 +1,15 @@
-const {User} = require('../model/model')
-const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
-// const ObjectId = require('mongodb').ObjectID;
+const { User } = require('../model/model')
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { PythonShell } = require('python-shell');
+const path = require('path');
+const { spawn } = require('child_process');
 
 
 //Sign up
 exports.signUp = async (req, res, next) => {
 
-    const { first_name, last_name, phone, email, password} = req.body;
+    const { first_name, last_name, phone, email, password } = req.body;
     //simple validation
     if (!first_name || !last_name || !email || !password || !phone) {
         res.status(400).json({ message: "All fields are required" })
@@ -35,7 +37,7 @@ exports.signUp = async (req, res, next) => {
                 await user.save()
                 const token = jwt.sign({
                     email: user.email, id: user._id, first_name: user.first_name,
-                                last_name: user.last_name, phone: user.phone, role: user.role
+                    last_name: user.last_name, phone: user.phone, role: user.role
                 }, process.env.jwtSecret);
 
                 res.status(200).send({
@@ -75,7 +77,7 @@ exports.signIn = (req, res) => {
                                 email: user.email, id: user._id, first_name: user.first_name,
                                 last_name: user.last_name, phone: user.phone, role: user.role
                             }, process.env.jwtSecret);
-                            
+
                             res.status(200).send({
                                 token, email: user.email, id: user._id, balance: user.balance,
                                 first_name: user.first_name, phone: user.phone, last_name: user.last_name, role: user.role
@@ -107,34 +109,63 @@ exports.getAllUsers = async (req, res) => {
 
 
 exports.updateUser = (req, res) => {
-  const userId = req.params.id;
-  const updatedFields = req.body;
-  User.findByIdAndUpdate(userId, { $set: updatedFields }, { new: true })
-    .then(updatedUser => {
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      res.status(200).json({ message: "User updated successfully", user: updatedUser });
-    })
-    .catch(error => {
-      console.error('Error updating user:', error);
-      res.status(500).json({ message: "Internal server error" });
-    });
+    const userId = req.params.id;
+    const updatedFields = req.body;
+    User.findByIdAndUpdate(userId, { $set: updatedFields }, { new: true })
+        .then(updatedUser => {
+            if (!updatedUser) {
+                return res.status(404).json({ message: "User not found" });
+            }
+            res.status(200).json({ message: "User updated successfully", user: updatedUser });
+        })
+        .catch(error => {
+            console.error('Error updating user:', error);
+            res.status(500).json({ message: "Internal server error" });
+        });
 };
 
-  
+
 exports.deleteUser = (req, res) => {
     const userId = req.params.id;
-  
+
     User.findByIdAndDelete(userId)
-      .then(deletedUser => {
-        if (!deletedUser) {
-          return res.status(404).json({ message: "User not found" });
+        .then(deletedUser => {
+            if (!deletedUser) {
+                return res.status(404).json({ message: "User not found" });
+            }
+            res.status(200).json({ message: "User deleted successfully" });
+        })
+        .catch(error => {
+            console.error('Error deleting user:', error);
+            res.status(500).json({ message: "Internal server error" });
+        });
+};
+
+
+exports.OLSPrediction = (req, res) => {
+    const scriptPath = path.join(__dirname, '../python/OLS.py');
+    
+    const pythonPath = "C:\\Users\\weldensie\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe"
+
+    const options = {
+        scriptPath: path.dirname(scriptPath),
+        pythonPath: pythonPath,
+        pythonOptions: ['-u'], 
+        args: [JSON.stringify(req.body.data)],
+    };
+
+    PythonShell.run('OLS.py', options, (err, results) => {
+        if (err) {
+            console.error('Error executing Python script:', err);
+            res.status(500).json({ error: 'Error executing Python script.' });
+        } else {
+            try {
+                const result = JSON.parse(results[0]);
+                res.json(result);
+            } catch (error) {
+                console.error('Error parsing Python script output:', error);
+                res.status(500).json({ error: 'Error parsing Python script output.' });
+            }
         }
-        res.status(200).json({ message: "User deleted successfully" });
-      })
-      .catch(error => {
-        console.error('Error deleting user:', error);
-        res.status(500).json({ message: "Internal server error" });
-      });
-  };
+    });
+};
