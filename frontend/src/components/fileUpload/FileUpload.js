@@ -182,24 +182,24 @@ const FileUpload = () => {
       });
       return rowData;
     });
-    const data = JSON.stringify({data: selectedData});
+    const data = {data: selectedData};
     setState((prevState) => ({
       ...prevState,
       predictionResult: predictionResults,
       showPredictResult: true,
     }));
 
-    // axios.post(`http://localhost:5000/${state.machineLearningMethod}`, data)
-    // .then(response => {
-    //   setState((prevState) => ({
-    //     ...prevState,
-    //     predictionResult: response.data,
-    //     showPredictResult: true,
-    //   }));    
-    // })
-    // .catch(err => {
-    //     console.log(err, 'Error in predict');
-    // });
+    axios.post(`http://localhost:5000/${state.machineLearningMethod}`, data)
+    .then(response => {
+      setState((prevState) => ({
+        ...prevState,
+        predictionResult: response.data,
+        showPredictResult: true,
+      }));    
+    })
+    .catch(err => {
+        console.log(err, 'Error in predict');
+    });
   };
   
   const handleInputChange = (name, value) => {
