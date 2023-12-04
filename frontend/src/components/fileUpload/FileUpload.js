@@ -80,7 +80,7 @@ const initialState = {
   independentVariables: [],
   predictionResult: [],
   showPredictResult: false,
-  id:'',
+  id: '',
   y: '',
   x: [],
 };
@@ -120,11 +120,10 @@ const FileUpload = () => {
     return new Promise((resolve) => {
       Papa.parse(file, {
         complete: (result) => {
+          console.log(result.data, 'oooooooooooo')
           const parsedData = result.data || [];
-          const filteredData = parsedData.length > 0 && parsedData.filter((row) =>
-            Object.values(row).every((value) => value !== undefined && value !== null && value !== '')
-          );
-
+          console.log(parsedData, 'parsedData')
+          const filteredData = parsedData.length > 0 && parsedData
           setState((prevState) => ({
             ...prevState,
             data: filteredData,
@@ -141,10 +140,10 @@ const FileUpload = () => {
 
   useEffect(() => {
     const fetchDataFromIndexedDB = async () => {
-    const db = await openDB();
-    const transaction = db.transaction("csvFiles", "readonly");
-    const csvFileStore = transaction.objectStore("csvFiles");
-    const cursor = csvFileStore.openCursor();
+      const db = await openDB();
+      const transaction = db.transaction("csvFiles", "readonly");
+      const csvFileStore = transaction.objectStore("csvFiles");
+      const cursor = csvFileStore.openCursor();
       cursor.onsuccess = (event) => {
         const cursor = event.target.result;
         if (cursor) {
@@ -174,7 +173,7 @@ const FileUpload = () => {
   const handlePredict = () => {
     const selectedData = state.data.map((row) => {
       const rowData = {
-        [state.id]: row[state.id], 
+        [state.id]: row[state.id],
         [state.y]: row[state.y],
       };
       state.x.forEach((variable) => {
@@ -182,7 +181,7 @@ const FileUpload = () => {
       });
       return rowData;
     });
-    const data = {data: selectedData};
+    const data = { data: selectedData };
     setState((prevState) => ({
       ...prevState,
       predictionResult: predictionResults,
@@ -190,18 +189,18 @@ const FileUpload = () => {
     }));
 
     axios.post(`http://localhost:5000/${state.machineLearningMethod}`, data)
-    .then(response => {
-      setState((prevState) => ({
-        ...prevState,
-        predictionResult: response.data,
-        showPredictResult: true,
-      }));    
-    })
-    .catch(err => {
+      .then(response => {
+        setState((prevState) => ({
+          ...prevState,
+          predictionResult: response.data,
+          showPredictResult: true,
+        }));
+      })
+      .catch(err => {
         console.log(err, 'Error in predict');
-    });
+      });
   };
-  
+
   const handleInputChange = (name, value) => {
     setState((prevData) => ({
       ...prevData,
