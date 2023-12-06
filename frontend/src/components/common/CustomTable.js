@@ -1,11 +1,23 @@
 import React, { useState } from 'react';
-import { Paper, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Box, Typography, Button, ButtonGroup } from '@mui/material';
+import {
+  Paper,
+  TableContainer,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Box,
+  Typography,
+  Button,
+  ButtonGroup,
+} from '@mui/material';
 
 const capitalizeFirstLetter = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const CustomTable = ({ data, filterData, title, itemsPerPage }) => {
+const CustomTable = ({ data, filterData, title, itemsPerPage, headers }) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -18,8 +30,6 @@ const CustomTable = ({ data, filterData, title, itemsPerPage }) => {
   };
 
   return (
-  
-
     <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '16px', width: '100%' }}>
       <Paper elevation={6} style={{ width: '95%', textAlign: 'center', marginBottom: '8px', padding: '16px' }}>
         <Typography variant="h6" gutterBottom style={{ fontWeight: 'bold' }}>
@@ -31,22 +41,21 @@ const CustomTable = ({ data, filterData, title, itemsPerPage }) => {
           <Table>
             <TableHead>
               <TableRow>
-                {data.length > 0 &&
-                  Object.keys(data[0]).map(key => !filterData.includes(key) && (
-                    <TableCell key={key} style={{ fontWeight: 'bold', textAlign: 'center' }}>
-                      {capitalizeFirstLetter(key.split('_').join(' '))}
-                    </TableCell>
-                  ))}
+                {headers.map((header) => (
+                  <TableCell key={header} style={{ fontWeight: 'bold', textAlign: 'center' }}>
+                    {capitalizeFirstLetter(header.split('_').join(' '))}
+                  </TableCell>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {slicedData.length > 0 ? (
                 slicedData.map((item, index) => (
                   <TableRow
-                    key={item._id}
+                    key={index} // Use index as the key if _id is not available
                     style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f3f3f3' }}
                   >
-                    {Object.keys(item).map(key => !filterData.includes(key) && (
+                    {headers.map((key) => !filterData.includes(key) && (
                       <TableCell key={key} style={{ textAlign: 'center' }}>
                         {item[key]}
                       </TableCell>
@@ -55,7 +64,7 @@ const CustomTable = ({ data, filterData, title, itemsPerPage }) => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={data.length > 0 ? Object.keys(data[0]).length - filterData.length + 1 : 1}>
+                  <TableCell colSpan={headers.length - filterData.length + 1}>
                     {data.length > 0 ? 'Loading...' : 'No data available'}
                   </TableCell>
                 </TableRow>
@@ -80,7 +89,6 @@ const CustomTable = ({ data, filterData, title, itemsPerPage }) => {
         </Box>
       )}
     </Box>
-
   );
 };
 

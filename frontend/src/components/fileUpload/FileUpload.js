@@ -80,9 +80,10 @@ const initialState = {
   independentVariables: [],
   predictionResult: [],
   showPredictResult: false,
-  id:'',
+  id: '',
   y: '',
   x: [],
+  c: []
 };
 
 
@@ -121,10 +122,7 @@ const FileUpload = () => {
       Papa.parse(file, {
         complete: (result) => {
           const parsedData = result.data || [];
-          const filteredData = parsedData.length > 0 && parsedData.filter((row) =>
-            Object.values(row).every((value) => value !== undefined && value !== null && value !== '')
-          );
-
+          const filteredData = parsedData.length > 0 && parsedData
           setState((prevState) => ({
             ...prevState,
             data: filteredData,
@@ -141,10 +139,10 @@ const FileUpload = () => {
 
   useEffect(() => {
     const fetchDataFromIndexedDB = async () => {
-    const db = await openDB();
-    const transaction = db.transaction("csvFiles", "readonly");
-    const csvFileStore = transaction.objectStore("csvFiles");
-    const cursor = csvFileStore.openCursor();
+      const db = await openDB();
+      const transaction = db.transaction("csvFiles", "readonly");
+      const csvFileStore = transaction.objectStore("csvFiles");
+      const cursor = csvFileStore.openCursor();
       cursor.onsuccess = (event) => {
         const cursor = event.target.result;
         if (cursor) {
@@ -172,9 +170,14 @@ const FileUpload = () => {
   };
 
   const handlePredict = () => {
+    const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar));
+    if (!isValidCategoricals) {
+      alert('Not all selected categorical variables are among the independent variables');
+      return;
+    }
     const selectedData = state.data.map((row) => {
       const rowData = {
-        [state.id]: row[state.id], 
+        [state.id]: row[state.id],
         [state.y]: row[state.y],
       };
       state.x.forEach((variable) => {
@@ -182,26 +185,31 @@ const FileUpload = () => {
       });
       return rowData;
     });
-    const data = {data: selectedData};
+    const nonEmptySelectedData = selectedData.filter((rowData) => {
+      return Object.values(rowData).every(value => value !== undefined && value !== null && value !== '');
+    });
+
+    const data = { data: nonEmptySelectedData, categorical: state.c };
     setState((prevState) => ({
       ...prevState,
       predictionResult: predictionResults,
       showPredictResult: true,
     }));
 
-    axios.post(`http://localhost:5000/${state.machineLearningMethod}`, data)
-    .then(response => {
-      setState((prevState) => ({
-        ...prevState,
-        predictionResult: response.data,
-        showPredictResult: true,
-      }));    
-    })
-    .catch(err => {
+    axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
+      .then(response => {
+        console.log(response.data, 'response from api')
+        setState((prevState) => ({
+          ...prevState,
+          predictionResult: response.data,
+          showPredictResult: true,
+        }));
+      })
+      .catch(err => {
         console.log(err, 'Error in predict');
-    });
+      });
   };
-  
+
   const handleInputChange = (name, value) => {
     setState((prevData) => ({
       ...prevData,
@@ -216,11 +224,11 @@ const FileUpload = () => {
     }));
   };
 
-  const removeVariable = (variable) => {
-    const updatedX = state.x.filter((x) => x !== variable);
+  const removeVariable = (variable, v) => {
+    const updatedX = state[v].filter((x) => x !== variable);
     setState((prevState) => ({
       ...prevState,
-      x: updatedX,
+      [v]: updatedX,
     }));
   };
 
@@ -254,11 +262,11 @@ const FileUpload = () => {
             onChange={handleFileChange}
           />
           <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>Machine Learning Method</InputLabel>
+            <InputLabel>Method</InputLabel>
             <Select
               value={state.machineLearningMethod}
               onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value })}
-              style={{ minWidth: '200px' }}
+              style={{ minWidth: '100px' }}
             >
               {mlMethods.map((method) => (
                 <MenuItem key={method} value={method}>
@@ -267,21 +275,6 @@ const FileUpload = () => {
               ))}
             </Select>
           </FormControl>
-          <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>Unique Identifier</InputLabel>
-            <Select
-              value={state.id}
-              onChange={(e) => handleInputChange('id', e.target.value)}
-              style={{ minWidth: '200px' }}
-            >
-              {state.dependentVariable.map((variable) => (
-                <MenuItem key={variable} value={variable}>
-                  {variable}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Dependent Variable</InputLabel>
             <Select
@@ -326,7 +319,51 @@ const FileUpload = () => {
                     <Chip
                       key={variable}
                       label={variable}
-                      onDelete={() => removeVariable(variable)}
+                      onDelete={() => removeVariable(variable, 'x')}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                  ))}
+                </div>
+              )}
+
+            >
+              {state.independentVariables.map((variable) => (
+                <MenuItem key={variable} value={variable}>
+                  {variable}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl style={{ marginLeft: '16px' }}>
+            <InputLabel>Categorical Variables</InputLabel>
+            <Select
+              multiple
+              value={state.c}
+              onChange={(e) => handleInputChange('c', e.target.value)}
+              style={{ minWidth: '200px' }}
+              MenuProps={{
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                },
+                transformOrigin: {
+                  vertical: 'top',
+                  horizontal: 'left',
+                },
+                getContentAnchorEl: null,
+                PaperProps: {
+                  style: {
+                    maxHeight: '200px',
+                  },
+                },
+              }}
+              renderValue={() => (
+                <div>
+                  {state.c.map((variable) => (
+                    <Chip
+                      key={variable}
+                      label={variable}
+                      onDelete={() => removeVariable(variable, 'c')}
                       onMouseDown={(e) => e.stopPropagation()}
                     />
                   ))}
@@ -378,6 +415,7 @@ const FileUpload = () => {
             filterData={filterData}
             title={state.machineLearningMethod + ' Results'}
             itemsPerPage={25}
+            headers={['field_name', 'mean', 'standard_error', 'p_value']}
           />
         </Box>
       )}
