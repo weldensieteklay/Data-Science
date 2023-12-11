@@ -2,11 +2,12 @@ from flask import jsonify, request
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from sklearn.model_selection import train_test_split
-from scipy.stats import zscore
+from statsmodels.regression.linear_model import GLS
 from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import sys
+from sklearn.model_selection import train_test_split
+from scipy.stats import zscore
 
 def calculate_vif(X):
     vif_data = pd.DataFrame()
@@ -20,15 +21,17 @@ def remove_outliers(df, columns, z_threshold=3):
     after_outliers = len(df)
     return df, before_outliers - after_outliers
 
-def run_ols_model():
+def run_gls_model():
     try:
         data = request.get_json()
-        if not data or 'data' not in data or 'categorical' not in data or 'outliers' not in data:
+        if not data or 'data' not in data or 'categorical' not in data:
             return jsonify({'error': 'Invalid or missing data in the request'}), 400 
 
         actual_data = data['data']
         categorical_variables = data['categorical']
-        remove_outliers_flag = data['outliers'].lower() == 'yes'
+
+        if len(actual_data) == 0 or not categorical_variables:
+            return jsonify({'error': 'Invalid categorical variable list or empty data'}), 400
 
         variable_names = list(actual_data[0].keys())
         dependent_variable_name = variable_names[1]
@@ -48,32 +51,39 @@ def run_ols_model():
         if len(df) < 2:  
             return jsonify({'error': 'Insufficient data after handling missing values'}), 400
 
-        removed_objects_count = 0
-        if remove_outliers_flag:
-            variables_to_check = df.columns.difference([id, dependent_variable_name])
-            df, removed_objects_count = remove_outliers(df, variables_to_check)
+        # Remove outliers from numerical columns
+        variables_to_check = df.columns.difference([id, dependent_variable_name])
+        df, removed_objects_count = remove_outliers(df, variables_to_check)
 
         y = np.array(df[dependent_variable_name])
         X = df.drop([id, dependent_variable_name], axis=1)
 
         X_with_intercept = sm.add_constant(X)
 
+        # Calculate VIF for each independent variable
         vif_data = calculate_vif(X_with_intercept.drop('const', axis=1))
+
+        # Include VIF data in the response
         vif_dict = {'VIF': vif_data.to_dict(orient='records')}
 
         X_train, X_test, y_train, y_test = train_test_split(X_with_intercept, y, test_size=0.1, random_state=42)
 
-        model = sm.OLS(y_train, X_train.astype(float))
+        # Use GLS instead of OLS
+        model = GLS(y_train, X_train.astype(float))
+
+        # Specify the covariance structure if needed, e.g., model.cov_struct = sm.cov_struct.Autoregressive()
+        
         results = model.fit()
 
+        # Breusch-Pagan test for heteroscedasticity
         bp_test_results = het_breuschpagan(results.resid, results.model.exog)
         bp_test_p_value = bp_test_results[1]
 
+        # Convert boolean values to integers
         is_multicollinear = int(any(vif_data['VIF'] > 10))  
         is_heteroscedastic = int(bp_test_p_value < 0.05)  
 
         X_response = X_with_intercept.copy()
-        results = sm.OLS(y, X_with_intercept.astype(float)).fit()
 
         y_pred = results.predict(X_test)
 
@@ -99,10 +109,6 @@ def run_ols_model():
         return jsonify({
             "data": results_dict,
             "mse": mse,
-            "vif": vif_dict,
-            "bp_test_p_value": bp_test_p_value,
-            "multicollinearity": "No multicollinearity" if is_multicollinear == 0 else "There is multicollinearity",
-            "heteroscedasticity": " No heteroscedasticity" if is_heteroscedastic == 0 else " There is heteroscedasticity",
             "outliers_count": removed_objects_count
         })
 

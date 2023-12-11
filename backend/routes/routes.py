@@ -18,6 +18,7 @@
 from flask import Blueprint
 from controller.controller import signUp, signIn, getAllUsers, updateUser, deleteUser
 from controller.OLS import run_ols_model  
+from controller.GLS import run_gls_model  
 
 routes = Blueprint('routes', __name__)
 
@@ -28,3 +29,4 @@ routes.route('/users', methods=['GET'])(getAllUsers)
 routes.route('/users/<int:id>', methods=['PATCH'])(updateUser)
 routes.route('/users/<int:id>', methods=['DELETE'])(deleteUser)
 routes.route('/OLS', methods=['POST'])(run_ols_model)
+routes.route('/GLS', methods=['POST'])(run_gls_model)

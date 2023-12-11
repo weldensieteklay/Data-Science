@@ -17,7 +17,7 @@ const capitalizeFirstLetter = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const CustomTable = ({ data, filterData, title, itemsPerPage, headers }) => {
+const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, multicollinearity, heteroscedasticity, outliers_count }) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -28,13 +28,20 @@ const CustomTable = ({ data, filterData, title, itemsPerPage, headers }) => {
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
   };
-
   return (
     <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '16px', width: '100%' }}>
       <Paper elevation={6} style={{ width: '95%', textAlign: 'center', marginBottom: '8px', padding: '16px' }}>
-        <Typography variant="h6" gutterBottom style={{ fontWeight: 'bold' }}>
+        <Typography variant="h6" gutterBottom style={{ fontWeight: 'bold', marginBottom: 25 }}>
           {title}
         </Typography>
+        <Box>
+          {mse && <span style={{ marginRight: 20 }}><strong>Mean Square Error</strong>: {mse}</span>
+          }       {multicollinearity && (<span>
+            <span style={{ marginRight: 20 }}><strong>Multicollinearity</strong>: {multicollinearity}</span>
+            <span style={{ marginRight: 20 }}><strong>Heteroscedasticity</strong>:{heteroscedasticity}</span>
+          </span>)}
+          {outliers_count !==0 && <span><strong>Number of Removed Outliers</strong>: {outliers_count}</span>}
+        </Box>
       </Paper>
       <Paper elevation={3} style={{ width: '95%', overflowX: 'auto' }}>
         <TableContainer component={Paper} style={{ minWidth: 300, width: '100%', margin: '0 auto' }}>

@@ -39,9 +39,7 @@ const ButtonSpacer = styled(Box)(({ theme }) => ({
   marginLeft: '16px',
 }));
 
-const mlMethods = ['OLS', 'LASSO', 'RIDGE'];
-const depVars = ['Variable 1', 'Variable 2', 'Variable 3'];
-const independentVars = ['IndepVar 1', 'IndepVar 2', 'IndepVar 3'];
+const mlMethods = ['OLS', 'GLS', 'LASSO', 'RIDGE'];
 
 const predictionResults = [
   { id: 1, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
@@ -51,26 +49,7 @@ const predictionResults = [
   { id: 5, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
   { id: 6, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
   { id: 7, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-  { id: 8, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-  { id: 9, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-  { id: 10, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-  { id: 11, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-  { id: 12, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-  { id: 13, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-  { id: 14, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-  { id: 15, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-  { id: 16, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-  { id: 17, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-  { id: 18, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-  { id: 19, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-  { id: 20, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-  { id: 21, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-  { id: 22, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-  { id: 23, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-  { id: 24, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-  { id: 25, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-  { id: 26, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-  { id: 27, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
+  { id: 8, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
 ];
 
 const initialState = {
@@ -83,7 +62,12 @@ const initialState = {
   id: '',
   y: '',
   x: [],
-  c: []
+  c: [],
+  mse: '',
+  multicollinearity: 0,
+  heteroscedasticity: 0,
+  outliers: 'No',
+  outliers_count:0
 };
 
 
@@ -189,7 +173,7 @@ const FileUpload = () => {
       return Object.values(rowData).every(value => value !== undefined && value !== null && value !== '');
     });
 
-    const data = { data: nonEmptySelectedData, categorical: state.c };
+    const data = { data: nonEmptySelectedData, categorical: state.c, outliers:state.outliers };
     setState((prevState) => ({
       ...prevState,
       predictionResult: predictionResults,
@@ -198,11 +182,14 @@ const FileUpload = () => {
 
     axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
       .then(response => {
-        console.log(response.data, 'response from api')
         setState((prevState) => ({
           ...prevState,
-          predictionResult: response.data,
+          predictionResult: response.data.data,
           showPredictResult: true,
+          mse: response.data.mse,
+          multicollinearity: response.data.multicollinearity,
+          heteroscedasticity: response.data.heteroscedasticity,
+          outliers_count:response.data.outliers_count
         }));
       })
       .catch(err => {
@@ -260,6 +247,7 @@ const FileUpload = () => {
             accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
             inputRef={fileInputRef}
             onChange={handleFileChange}
+            style={{ width: '250px' }}
           />
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Method</InputLabel>
@@ -280,7 +268,7 @@ const FileUpload = () => {
             <Select
               value={state.y}
               onChange={(e) => handleInputChange('y', e.target.value)}
-              style={{ minWidth: '200px' }}
+              style={{ minWidth: '150px' }}
             >
               {state.dependentVariable.map((variable) => (
                 <MenuItem key={variable} value={variable}>
@@ -378,6 +366,21 @@ const FileUpload = () => {
               ))}
             </Select>
           </FormControl>
+          <FormControl style={{ marginLeft: '16px' }}>
+            <InputLabel>Outliers</InputLabel>
+            <Select
+              value={state.outliers}
+              onChange={(e) => setState({ ...state, outliers: e.target.value })}
+              style={{ minWidth: '150px' }}
+            >
+              <MenuItem value='Yes'>
+              Remove Outliers
+              </MenuItem>
+              <MenuItem value='No'>
+              Keep Outliers
+              </MenuItem>
+            </Select>
+          </FormControl>
         </Box>
         <ButtonContainer>
           <Button
@@ -412,10 +415,14 @@ const FileUpload = () => {
         >
           <CustomTable
             data={state.predictionResult}
+            mse={state.mse}
             filterData={filterData}
             title={state.machineLearningMethod + ' Results'}
             itemsPerPage={25}
             headers={['field_name', 'mean', 'standard_error', 'p_value']}
+            heteroscedasticity={state.heteroscedasticity}
+            multicollinearity={state.multicollinearity}
+            outliers_count={state.outliers_count}
           />
         </Box>
       )}
