@@ -24,15 +24,11 @@ def remove_outliers(df, columns, z_threshold=3):
 def run_gls_model():
     try:
         data = request.get_json()
-        if not data or 'data' not in data or 'categorical' not in data:
+        if not data or 'data' not in data or 'outliers' not in data:
             return jsonify({'error': 'Invalid or missing data in the request'}), 400 
 
         actual_data = data['data']
-        categorical_variables = data['categorical']
-
-        if len(actual_data) == 0 or not categorical_variables:
-            return jsonify({'error': 'Invalid categorical variable list or empty data'}), 400
-
+        categorical_variables = data.get('categorical', [])  # Using get to handle missing key gracefully
         variable_names = list(actual_data[0].keys())
         dependent_variable_name = variable_names[1]
         id = variable_names[0]
@@ -51,38 +47,25 @@ def run_gls_model():
         if len(df) < 2:  
             return jsonify({'error': 'Insufficient data after handling missing values'}), 400
 
-        # Remove outliers from numerical columns
-        variables_to_check = df.columns.difference([id, dependent_variable_name])
-        df, removed_objects_count = remove_outliers(df, variables_to_check)
+        # Check if outliers should be removed
+        remove_outliers_flag = data.get('outliers', '').lower() == 'yes'
+        if remove_outliers_flag:
+            variables_to_check = df.columns.difference([id, dependent_variable_name])
+            df, removed_objects_count = remove_outliers(df, variables_to_check)
+        else:
+            removed_objects_count = 0
 
         y = np.array(df[dependent_variable_name])
         X = df.drop([id, dependent_variable_name], axis=1)
 
         X_with_intercept = sm.add_constant(X)
 
-        # Calculate VIF for each independent variable
-        vif_data = calculate_vif(X_with_intercept.drop('const', axis=1))
-
-        # Include VIF data in the response
-        vif_dict = {'VIF': vif_data.to_dict(orient='records')}
-
         X_train, X_test, y_train, y_test = train_test_split(X_with_intercept, y, test_size=0.1, random_state=42)
 
         # Use GLS instead of OLS
         model = GLS(y_train, X_train.astype(float))
-
-        # Specify the covariance structure if needed, e.g., model.cov_struct = sm.cov_struct.Autoregressive()
         
         results = model.fit()
-
-        # Breusch-Pagan test for heteroscedasticity
-        bp_test_results = het_breuschpagan(results.resid, results.model.exog)
-        bp_test_p_value = bp_test_results[1]
-
-        # Convert boolean values to integers
-        is_multicollinear = int(any(vif_data['VIF'] > 10))  
-        is_heteroscedastic = int(bp_test_p_value < 0.05)  
-
         X_response = X_with_intercept.copy()
 
         y_pred = results.predict(X_test)

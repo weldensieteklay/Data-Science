@@ -40,7 +40,7 @@ const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, mult
             <span style={{ marginRight: 20 }}><strong>Multicollinearity</strong>: {multicollinearity}</span>
             <span style={{ marginRight: 20 }}><strong>Heteroscedasticity</strong>:{heteroscedasticity}</span>
           </span>)}
-          {outliers_count !==0 && <span><strong>Number of Removed Outliers</strong>: {outliers_count}</span>}
+          {outliers_count >0 && <span><strong>Number of Removed Outliers</strong>: {outliers_count}</span>}
         </Box>
       </Paper>
       <Paper elevation={3} style={{ width: '95%', overflowX: 'auto' }}>

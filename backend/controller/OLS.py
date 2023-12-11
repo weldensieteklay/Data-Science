@@ -23,7 +23,7 @@ def remove_outliers(df, columns, z_threshold=3):
 def run_ols_model():
     try:
         data = request.get_json()
-        if not data or 'data' not in data or 'categorical' not in data or 'outliers' not in data:
+        if not data or 'data' not in data:
             return jsonify({'error': 'Invalid or missing data in the request'}), 400 
 
         actual_data = data['data']
@@ -48,10 +48,12 @@ def run_ols_model():
         if len(df) < 2:  
             return jsonify({'error': 'Insufficient data after handling missing values'}), 400
 
-        removed_objects_count = 0
+        remove_outliers_flag = data.get('outliers', '').lower() == 'yes'
         if remove_outliers_flag:
             variables_to_check = df.columns.difference([id, dependent_variable_name])
             df, removed_objects_count = remove_outliers(df, variables_to_check)
+        else:
+            removed_objects_count = 0
 
         y = np.array(df[dependent_variable_name])
         X = df.drop([id, dependent_variable_name], axis=1)
