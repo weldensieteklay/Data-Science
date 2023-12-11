@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.regression.linear_model import GLS
-from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import sys
 from sklearn.model_selection import train_test_split
@@ -81,6 +80,7 @@ def run_gls_model():
         standard_error = results.bse[1:]  
         p_value = results.pvalues[1:]  
         const = results.params[0]
+        rsquared = results.rsquared  
 
         results_dict = [
             {'field_name': 'constant', 'mean': f"{const:.3f}", 'standard_error': f"{results.bse[0]:.3f}", 'p_value': f"{results.pvalues[0]:.3f}"}
@@ -92,7 +92,8 @@ def run_gls_model():
         return jsonify({
             "data": results_dict,
             "mse": mse,
-            "outliers_count": removed_objects_count
+            "outliers_count": removed_objects_count,
+            "R2": rsquared
         })
 
     except Exception as e:

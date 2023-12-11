@@ -67,7 +67,8 @@ const initialState = {
   multicollinearity: 0,
   heteroscedasticity: 0,
   outliers: 'No',
-  outliers_count:0
+  outliers_count:0,
+  R2:null
 };
 
 
@@ -189,7 +190,8 @@ const FileUpload = () => {
           mse: response.data.mse,
           multicollinearity: response.data.multicollinearity,
           heteroscedasticity: response.data.heteroscedasticity,
-          outliers_count:response.data.outliers_count
+          outliers_count:response.data.outliers_count,
+          R2:response.data.R2
         }));
       })
       .catch(err => {
@@ -197,7 +199,7 @@ const FileUpload = () => {
       });
   };
 
-  const handleInputChange = (name, value) => {
+ const handleInputChange = (name, value) => {
     setState((prevData) => ({
       ...prevData,
       [name]: value,
@@ -423,6 +425,7 @@ const FileUpload = () => {
             heteroscedasticity={state.heteroscedasticity}
             multicollinearity={state.multicollinearity}
             outliers_count={state.outliers_count}
+            R2={state.R2}
           />
         </Box>
       )}

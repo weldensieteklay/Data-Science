@@ -17,7 +17,7 @@ const capitalizeFirstLetter = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, multicollinearity, heteroscedasticity, outliers_count }) => {
+const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, R2, multicollinearity, heteroscedasticity, outliers_count }) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -35,8 +35,9 @@ const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, mult
           {title}
         </Typography>
         <Box>
-          {mse && <span style={{ marginRight: 20 }}><strong>Mean Square Error</strong>: {mse}</span>
-          }       {multicollinearity && (<span>
+          {mse && <span style={{ marginRight: 20 }}><strong>Mean Square Error</strong>: {mse}</span>}
+          {R2>0 && <span style={{ marginRight: 20 }}><strong>R Square</strong>: {R2}</span>}       
+          {multicollinearity && (<span>
             <span style={{ marginRight: 20 }}><strong>Multicollinearity</strong>: {multicollinearity}</span>
             <span style={{ marginRight: 20 }}><strong>Heteroscedasticity</strong>:{heteroscedasticity}</span>
           </span>)}

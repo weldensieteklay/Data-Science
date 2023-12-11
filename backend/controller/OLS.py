@@ -7,11 +7,18 @@ from scipy.stats import zscore
 from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import sys
-
 def calculate_vif(X):
-    vif_data = pd.DataFrame()
-    vif_data["Variable"] = X.columns
-    vif_data["VIF"] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+    if X.shape[1] == 1:
+        # If there is only one variable, return a default or placeholder value
+        vif_data = pd.DataFrame({"Variable": X.columns, "VIF": [0]})
+    else:
+        vif_data = pd.DataFrame()
+        vif_data["Variable"] = X.columns
+        vif_data["VIF"] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+
+        # Handle NaN or zero-size array in VIF calculation
+        vif_data["VIF"] = np.where(np.isnan(vif_data["VIF"]) | (vif_data["VIF"] == np.inf), 0, vif_data["VIF"])
+
     return vif_data
 
 def remove_outliers(df, columns, z_threshold=3):
@@ -90,7 +97,8 @@ def run_ols_model():
         standard_error = results.bse[1:]  
         p_value = results.pvalues[1:]  
         const = results.params[0]
-
+        rsquared = round(results.rsquared, 3)
+        
         results_dict = [
             {'field_name': 'constant', 'mean': f"{const:.3f}", 'standard_error': f"{results.bse[0]:.3f}", 'p_value': f"{results.pvalues[0]:.3f}"}
         ] + [
@@ -105,7 +113,8 @@ def run_ols_model():
             "bp_test_p_value": bp_test_p_value,
             "multicollinearity": "No multicollinearity" if is_multicollinear == 0 else "There is multicollinearity",
             "heteroscedasticity": " No heteroscedasticity" if is_heteroscedastic == 0 else " There is heteroscedasticity",
-            "outliers_count": removed_objects_count
+            "outliers_count": removed_objects_count,
+            "R2": rsquared
         })
 
     except Exception as e:
