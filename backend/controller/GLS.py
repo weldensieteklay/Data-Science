@@ -8,6 +8,10 @@ import sys
 from sklearn.model_selection import train_test_split
 from scipy.stats import zscore
 
+def custom_round(number, decimal_places=3):
+    formatted_number = '{:.{prec}g}'.format(number, prec=decimal_places)
+    return formatted_number.rstrip('0') if '.' in formatted_number else formatted_number
+
 def calculate_vif(X):
     vif_data = pd.DataFrame()
     vif_data["Variable"] = X.columns
@@ -80,7 +84,7 @@ def run_gls_model():
         standard_error = results.bse[1:]  
         p_value = results.pvalues[1:]  
         const = results.params[0]
-        rsquared = results.rsquared  
+        rsquared = custom_round(results.rsquared, 3)
 
         results_dict = [
             {'field_name': 'constant', 'mean': f"{const:.3f}", 'standard_error': f"{results.bse[0]:.3f}", 'p_value': f"{results.pvalues[0]:.3f}"}

@@ -7,6 +7,8 @@ from scipy.stats import zscore
 from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import sys
+from decimal import Decimal, ROUND_HALF_UP
+
 def calculate_vif(X):
     if X.shape[1] == 1:
         # If there is only one variable, return a default or placeholder value
@@ -26,6 +28,13 @@ def remove_outliers(df, columns, z_threshold=3):
     df = df[(np.abs(zscore(df[columns])) < z_threshold).all(axis=1)]
     after_outliers = len(df)
     return df, before_outliers - after_outliers
+
+
+def custom_round(number, decimal_places=3):
+    formatted_number = '{:.{prec}g}'.format(number, prec=decimal_places)
+    return formatted_number.rstrip('0') if '.' in formatted_number else formatted_number
+
+
 
 def run_ols_model():
     try:
@@ -97,7 +106,7 @@ def run_ols_model():
         standard_error = results.bse[1:]  
         p_value = results.pvalues[1:]  
         const = results.params[0]
-        rsquared = round(results.rsquared, 3)
+        rsquared = custom_round(results.rsquared)
         
         results_dict = [
             {'field_name': 'constant', 'mean': f"{const:.3f}", 'standard_error': f"{results.bse[0]:.3f}", 'p_value': f"{results.pvalues[0]:.3f}"}
