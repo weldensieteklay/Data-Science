@@ -60,7 +60,7 @@ const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, R2, 
               {slicedData.length > 0 ? (
                 slicedData.map((item, index) => (
                   <TableRow
-                    key={index} // Use index as the key if _id is not available
+                    key={index} 
                     style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f3f3f3' }}
                   >
                     {headers.map((key) => !filterData.includes(key) && (

@@ -1,24 +1,12 @@
-# // const express = require('express');
-# // const authController = require('../controller/controller');
-
-# // const router = express.Router();
-
-# // //user routes
-# // router.post('/users/signin', authController.signIn);
-# // router.post('/users/signup', authController.signUp);
-# // router.get('/users', authController.getAllUsers);
-# // router.delete('/users/:id', authController.deleteUser);
-# // router.patch('/users/:id', authController.updateUser);
-# // router.post('/OLS', authController.OLSPrediction);
-
-
-# // module.exports = router;
-
-
 from flask import Blueprint
 from controller.controller import signUp, signIn, getAllUsers, updateUser, deleteUser
 from controller.OLS import run_ols_model  
 from controller.GLS import run_gls_model  
+from controller.LASSO import run_lasso_model  
+from controller.RIDGE import run_ridge_model  
+from controller.BAGGING import run_bagging_model
+from controller.FOREST import run_random_forest_model
+from controller.BOOSTING import run_boosting_model
 
 routes = Blueprint('routes', __name__)
 
@@ -30,3 +18,8 @@ routes.route('/users/<int:id>', methods=['PATCH'])(updateUser)
 routes.route('/users/<int:id>', methods=['DELETE'])(deleteUser)
 routes.route('/OLS', methods=['POST'])(run_ols_model)
 routes.route('/GLS', methods=['POST'])(run_gls_model)
+routes.route('/RIDGE', methods=['POST'])(run_ridge_model)
+routes.route('/LASSO', methods=['POST'])(run_lasso_model)
+routes.route('/RANDOM-FOREST', methods=['POST'])(run_random_forest_model)
+routes.route('/BAGGING', methods=['POST'])(run_bagging_model)
+routes.route('/BOOSTING', methods=['POST'])(run_boosting_model)

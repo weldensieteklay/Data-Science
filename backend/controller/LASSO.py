@@ -1,24 +1,11 @@
-from flask import jsonify, request
+# lasso_model.py
+from sklearn.linear_model import Lasso
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
 from sklearn.model_selection import train_test_split
+import statsmodels.api as sm
 from scipy.stats import zscore
-from statsmodels.stats.diagnostic import het_breuschpagan
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-import sys
-from decimal import Decimal, ROUND_HALF_UP
-
-def calculate_vif(X):
-    if X.shape[1] == 1:
-        vif_data = pd.DataFrame({"Variable": X.columns, "VIF": [0]})
-    else:
-        vif_data = pd.DataFrame()
-        vif_data["Variable"] = X.columns
-        vif_data["VIF"] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
-        vif_data["VIF"] = np.where(np.isnan(vif_data["VIF"]) | (vif_data["VIF"] == np.inf), 0, vif_data["VIF"])
-
-    return vif_data
+from flask import jsonify, request
 
 def remove_outliers(df, columns, z_threshold=3):
     before_outliers = len(df)
@@ -26,12 +13,11 @@ def remove_outliers(df, columns, z_threshold=3):
     after_outliers = len(df)
     return df, before_outliers - after_outliers
 
-
 def custom_round(number, decimal_places=3):
     formatted_number = '{:.{prec}g}'.format(number, prec=decimal_places)
     return formatted_number.rstrip('0') if '.' in formatted_number else formatted_number
 
-def run_ols_model():
+def run_lasso_model():
     try:
         data = request.get_json()
         if not data or 'data' not in data:
@@ -71,22 +57,10 @@ def run_ols_model():
 
         X_with_intercept = sm.add_constant(X)
 
-        vif_data = calculate_vif(X_with_intercept.drop('const', axis=1))
-        vif_dict = {'VIF': vif_data.to_dict(orient='records')}
-
         X_train, X_test, y_train, y_test = train_test_split(X_with_intercept, y, test_size=0.1, random_state=42)
 
-        model = sm.OLS(y_train, X_train.astype(float))
-        results = model.fit()
-
-        bp_test_results = het_breuschpagan(results.resid, results.model.exog)
-        bp_test_p_value = bp_test_results[1]
-
-        is_multicollinear = int(any(vif_data['VIF'] > 10))  
-        is_heteroscedastic = int(bp_test_p_value < 0.05)  
-
-        X_response = X_with_intercept.copy()
-        results = sm.OLS(y, X_with_intercept.astype(float)).fit()
+        model = Lasso()
+        results = model.fit(X_train, y_train)
 
         y_pred = results.predict(X_test)
 
@@ -94,33 +68,22 @@ def run_ols_model():
 
         mse = int(np.round(np.mean(squared_diff)))
 
-        print("Regression Results on Test Data:")
-        print(results.summary())
+        coefficients = results.coef_
+        const = results.intercept_
 
-        mean = results.params[1:]  
-        standard_error = results.bse[1:]  
-        p_value = results.pvalues[1:]  
-        const = results.params[0]
-        rsquared = custom_round(results.rsquared)
-        
         results_dict = [
-            {'field_name': 'constant', 'mean': f"{const:.3f}", 'standard_error': f"{results.bse[0]:.3f}", 'p_value': f"{results.pvalues[0]:.3f}"}
+            {'field_name': 'constant', 'mean': f"{const:.3f}"}
         ] + [
-            {'field_name': name, 'mean': f"{coef:.3f}", 'standard_error': f"{se:.3f}", 'p_value': f"{pv:.3f}"}
-            for name, coef, se, pv in zip(X_response.columns[1:], mean, standard_error, p_value)
+            {'field_name': name, 'mean': f"{coef:.3f}"}
+            for name, coef in zip(X_with_intercept.columns[1:], coefficients)
         ]
 
         return jsonify({
             "data": results_dict,
             "mse": mse,
-            "vif": vif_dict,
-            "bp_test_p_value": bp_test_p_value,
-            "multicollinearity": "No multicollinearity" if is_multicollinear == 0 else "There is multicollinearity",
-            "heteroscedasticity": " No heteroscedasticity" if is_heteroscedastic == 0 else " There is heteroscedasticity",
             "outliers_count": removed_objects_count,
-            "R2": rsquared
         })
 
     except Exception as e:
-        print(f"An error occurred: {repr(e)}", file=sys.stderr)
-        return jsonify({'error': repr(e)}), 500
+        print(f"An error occurred: {repr(e)}")  
+        return jsonify({'error': repr(e)}), 500  

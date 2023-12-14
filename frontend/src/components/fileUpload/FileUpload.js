@@ -4,6 +4,7 @@ import { styled } from '@mui/material/styles';
 import Papa from 'papaparse';
 import axios from 'axios';
 import CustomTable from '../common/CustomTable';
+import TreeCustomTable from '../common/TreeCustomTable';
 
 const StyledTitle = styled(Typography)(({ theme }) => ({
   color: 'white',
@@ -39,7 +40,7 @@ const ButtonSpacer = styled(Box)(({ theme }) => ({
   marginLeft: '16px',
 }));
 
-const mlMethods = ['OLS', 'GLS', 'LASSO', 'RIDGE'];
+const mlMethods = ['OLS', 'GLS', 'LASSO', 'RIDGE', 'BOOSTING', 'BAGGING', 'RANDOM-FOREST'];
 
 const predictionResults = [
   { id: 1, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
@@ -67,8 +68,9 @@ const initialState = {
   multicollinearity: 0,
   heteroscedasticity: 0,
   outliers: 'No',
-  outliers_count:0,
-  R2:null
+  outliers_count: 0,
+  R2: null,
+  treeResponse: null
 };
 
 
@@ -174,32 +176,38 @@ const FileUpload = () => {
       return Object.values(rowData).every(value => value !== undefined && value !== null && value !== '');
     });
 
-    const data = { data: nonEmptySelectedData, categorical: state.c, outliers:state.outliers };
+    const data = { data: nonEmptySelectedData, categorical: state.c, outliers: state.outliers };
     setState((prevState) => ({
       ...prevState,
-      predictionResult: predictionResults,
-      showPredictResult: true,
+      showPredictResult: false,
     }));
-
     axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
       .then(response => {
-        setState((prevState) => ({
-          ...prevState,
-          predictionResult: response.data.data,
-          showPredictResult: true,
-          mse: response.data.mse,
-          multicollinearity: response.data.multicollinearity,
-          heteroscedasticity: response.data.heteroscedasticity,
-          outliers_count:response.data.outliers_count,
-          R2:response.data.R2
-        }));
+        if (state.machineLearningMethod === "RANDOM-FOREST") {
+          setState((prevState) => ({
+            ...prevState,
+            treeResponse: response.data,
+            showPredictResult: true
+          }));
+        } else {
+          setState((prevState) => ({
+            ...prevState,
+            predictionResult: response.data.data,
+            showPredictResult: true,
+            mse: response.data.mse,
+            multicollinearity: response.data.multicollinearity,
+            heteroscedasticity: response.data.heteroscedasticity,
+            outliers_count: response.data.outliers_count,
+            R2: response.data.R2
+          }));
+        }
       })
       .catch(err => {
         console.log(err, 'Error in predict');
       });
   };
 
- const handleInputChange = (name, value) => {
+  const handleInputChange = (name, value) => {
     setState((prevData) => ({
       ...prevData,
       [name]: value,
@@ -376,10 +384,10 @@ const FileUpload = () => {
               style={{ minWidth: '150px' }}
             >
               <MenuItem value='Yes'>
-              Remove Outliers
+                Remove Outliers
               </MenuItem>
               <MenuItem value='No'>
-              Keep Outliers
+                Keep Outliers
               </MenuItem>
             </Select>
           </FormControl>
@@ -404,7 +412,7 @@ const FileUpload = () => {
           </Button>
         </ButtonContainer>
       </ContentWrapper>
-      {state.showPredictResult && state.machineLearningMethod && (
+      {state.showPredictResult && state.machineLearningMethod !== "RANDOM-FOREST" && (
         <Box
           style={{
             display: 'flex',
@@ -429,6 +437,24 @@ const FileUpload = () => {
           />
         </Box>
       )}
+      {
+        state.showPredictResult && state.machineLearningMethod === "RANDOM-FOREST" && (
+          <Box
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginTop: '16px',
+            width: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <TreeCustomTable
+            response={state.treeResponse}
+          />
+          </Box>
+        )
+      }
     </Box>
   );
 };
