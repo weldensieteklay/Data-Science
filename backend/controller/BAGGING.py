@@ -1,10 +1,9 @@
-# bagging_model.py
-from sklearn.ensemble import BaggingRegressor
+from sklearn.ensemble import RandomForestRegressor, BaggingRegressor
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 from flask import jsonify, request
+from sklearn.preprocessing import StandardScaler
 
 def remove_outliers(df, columns, z_threshold=3):
     before_outliers = len(df)
@@ -44,7 +43,6 @@ def run_bagging_model():
         if remove_outliers_flag:
             variables_to_check = df.columns.difference([id, dependent_variable_name])
             
-            # Standardize the features to handle outliers
             scaler = StandardScaler()
             df[variables_to_check] = scaler.fit_transform(df[variables_to_check])
 
@@ -53,9 +51,9 @@ def run_bagging_model():
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 
-        # Use BaggingRegressor with a base model (you can replace the base model with the one suitable for your data)
-        base_model = YourBaseModel()  # Replace YourBaseModel with the desired base model
-        model = BaggingRegressor(base_model, n_estimators=10, random_state=42)
+        # Use BaggingRegressor with RandomForestRegressor as the base estimator
+        base_estimator = RandomForestRegressor(n_estimators=100, random_state=42)
+        model = BaggingRegressor(base_estimator=base_estimator, n_estimators=10, random_state=42)
         results = model.fit(X_train, y_train)
 
         y_pred = results.predict(X_test)
@@ -64,8 +62,12 @@ def run_bagging_model():
 
         mse = int(np.round(np.mean(squared_diff)))
 
+        feature_importance = results.estimators_[0].feature_importances_
+        sorted_feature_importance = sorted(feature_importance, key=lambda x: x[1], reverse=True)
+
         return jsonify({
             "mse": mse,
+            "feature_importance": [{"feature": feature, "importance": importance} for feature, importance in sorted_feature_importance],
             "outliers_count": 0 if not remove_outliers_flag else len(df) - len(X_train),
         })
 

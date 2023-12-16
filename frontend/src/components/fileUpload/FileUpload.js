@@ -40,18 +40,9 @@ const ButtonSpacer = styled(Box)(({ theme }) => ({
   marginLeft: '16px',
 }));
 
-const mlMethods = ['OLS', 'GLS', 'LASSO', 'RIDGE', 'BOOSTING', 'BAGGING', 'RANDOM-FOREST'];
-
-const predictionResults = [
-  { id: 1, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-  { id: 2, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-  { id: 3, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-  { id: 4, mean: 0.38, standard_error: 0.028, p_value: 0.07 },
-  { id: 5, mean: 0.34, standard_error: 0.024, p_value: 0.05 },
-  { id: 6, mean: 0.42, standard_error: 0.032, p_value: 0.03 },
-  { id: 7, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-  { id: 8, mean: 0.28, standard_error: 0.018, p_value: 0.08 },
-];
+const mlMethods1 = ['OLS', 'GLS', 'LASSO', 'RIDGE'];
+const mlMethods2 = ['BOOSTING', 'BAGGING', 'RANDOM-FOREST', 'NEURAL_NETWORK'];
+const mlMethods = [...mlMethods1, ...mlMethods2];
 
 const initialState = {
   data: [],
@@ -183,7 +174,7 @@ const FileUpload = () => {
     }));
     axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
       .then(response => {
-        if (state.machineLearningMethod === "RANDOM-FOREST") {
+        if (mlMethods2.includes(state.machineLearningMethod)) {
           setState((prevState) => ({
             ...prevState,
             treeResponse: response.data,
@@ -228,7 +219,6 @@ const FileUpload = () => {
       [v]: updatedX,
     }));
   };
-
   const filterData = ['actions'];
   return (
     <Box
@@ -412,7 +402,7 @@ const FileUpload = () => {
           </Button>
         </ButtonContainer>
       </ContentWrapper>
-      {state.showPredictResult && state.machineLearningMethod !== "RANDOM-FOREST" && (
+      {state.showPredictResult && mlMethods1.includes(state.machineLearningMethod) && (
         <Box
           style={{
             display: 'flex',
@@ -438,7 +428,7 @@ const FileUpload = () => {
         </Box>
       )}
       {
-        state.showPredictResult && state.machineLearningMethod === "RANDOM-FOREST" && (
+        state.showPredictResult && mlMethods2.includes(state.machineLearningMethod) && (
           <Box
           style={{
             display: 'flex',
@@ -451,6 +441,7 @@ const FileUpload = () => {
         >
           <TreeCustomTable
             response={state.treeResponse}
+            title={state.machineLearningMethod}
           />
           </Box>
         )

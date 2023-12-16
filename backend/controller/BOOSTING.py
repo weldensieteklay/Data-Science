@@ -1,10 +1,9 @@
-# boosting_model.py
-from sklearn.ensemble import GradientBoostingRegressor
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 from flask import jsonify, request
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBRegressor
 
 def remove_outliers(df, columns, z_threshold=3):
     before_outliers = len(df)
@@ -12,7 +11,7 @@ def remove_outliers(df, columns, z_threshold=3):
     after_outliers = len(df)
     return df, before_outliers - after_outliers
 
-def run_boosting_model():
+def run_xgboost_model():
     try:
         data = request.get_json()
         if not data or 'data' not in data:
@@ -44,7 +43,6 @@ def run_boosting_model():
         if remove_outliers_flag:
             variables_to_check = df.columns.difference([id, dependent_variable_name])
             
-            # Standardize the features to handle outliers
             scaler = StandardScaler()
             df[variables_to_check] = scaler.fit_transform(df[variables_to_check])
 
@@ -53,8 +51,8 @@ def run_boosting_model():
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 
-        # Use GradientBoostingRegressor
-        model = GradientBoostingRegressor(n_estimators=10, random_state=42)
+        # Use XGBRegressor for boosting
+        model = XGBRegressor(n_estimators=100, random_state=42)
         results = model.fit(X_train, y_train)
 
         y_pred = results.predict(X_test)
@@ -63,8 +61,16 @@ def run_boosting_model():
 
         mse = int(np.round(np.mean(squared_diff)))
 
+        # XGBoost provides feature importance directly
+        feature_importance = results.feature_importances_
+        sorted_feature_importance = sorted(zip(X.columns, feature_importance), key=lambda item: item[1], reverse=True)
+
+        # Convert float32 to float for JSON serialization
+        sorted_feature_importance = [{"feature": feature, "importance": float(importance)} for feature, importance in sorted_feature_importance]
+
         return jsonify({
             "mse": mse,
+            "feature_importance": sorted_feature_importance,
             "outliers_count": 0 if not remove_outliers_flag else len(df) - len(X_train),
         })
 

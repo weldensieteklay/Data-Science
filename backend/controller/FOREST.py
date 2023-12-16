@@ -5,6 +5,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from flask import jsonify, request
+from sklearn.preprocessing import StandardScaler
 
 def remove_outliers(df, columns, z_threshold=3):
     before_outliers = len(df)
@@ -44,7 +45,6 @@ def run_random_forest_model():
         if remove_outliers_flag:
             variables_to_check = df.columns.difference([id, dependent_variable_name])
             
-            # Standardize the features to handle outliers
             scaler = StandardScaler()
             df[variables_to_check] = scaler.fit_transform(df[variables_to_check])
 
@@ -53,7 +53,6 @@ def run_random_forest_model():
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 
-        # Use RandomForestRegressor
         model = RandomForestRegressor(n_estimators=100, random_state=42)
         results = model.fit(X_train, y_train)
 

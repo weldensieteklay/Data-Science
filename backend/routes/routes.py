@@ -6,8 +6,8 @@ from controller.LASSO import run_lasso_model
 from controller.RIDGE import run_ridge_model  
 from controller.BAGGING import run_bagging_model
 from controller.FOREST import run_random_forest_model
-from controller.BOOSTING import run_boosting_model
-
+from controller.BOOSTING import run_xgboost_model
+from controller.Neural_Network import run_neural_network_model
 routes = Blueprint('routes', __name__)
 
 # Define your routes using the imported functions
@@ -22,4 +22,5 @@ routes.route('/RIDGE', methods=['POST'])(run_ridge_model)
 routes.route('/LASSO', methods=['POST'])(run_lasso_model)
 routes.route('/RANDOM-FOREST', methods=['POST'])(run_random_forest_model)
 routes.route('/BAGGING', methods=['POST'])(run_bagging_model)
-routes.route('/BOOSTING', methods=['POST'])(run_boosting_model)
+routes.route('/BOOSTING', methods=['POST'])(run_xgboost_model)
+routes.route('/NEURAL_NETWORK', methods=['POST'])(run_neural_network_model)
