@@ -61,7 +61,9 @@ const initialState = {
   outliers: 'No',
   outliers_count: 0,
   R2: null,
-  treeResponse: null
+  treeResponse: null,
+  summaryStatistics: [],
+  showSummaryStat: false
 };
 
 
@@ -171,6 +173,7 @@ const FileUpload = () => {
     setState((prevState) => ({
       ...prevState,
       showPredictResult: false,
+      showSummaryStat: false
     }));
     axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
       .then(response => {
@@ -178,7 +181,8 @@ const FileUpload = () => {
           setState((prevState) => ({
             ...prevState,
             treeResponse: response.data,
-            showPredictResult: true
+            showPredictResult: true,
+            showSummaryStat: false
           }));
         } else {
           setState((prevState) => ({
@@ -189,7 +193,8 @@ const FileUpload = () => {
             multicollinearity: response.data.multicollinearity,
             heteroscedasticity: response.data.heteroscedasticity,
             outliers_count: response.data.outliers_count,
-            R2: response.data.R2
+            R2: response.data.R2,
+            showSummaryStat: false
           }));
         }
       })
@@ -217,9 +222,108 @@ const FileUpload = () => {
     setState((prevState) => ({
       ...prevState,
       [v]: updatedX,
+      showSummaryStat: false
     }));
   };
-  const filterData = ['actions'];
+
+  const handleSummary = () => {
+    const selectedData = state.data.map((row) => {
+      const rowData = {
+        [state.id]: row[state.id],
+        [state.y]: parseFloat(row[state.y]),
+      };
+      state.x.forEach((variable) => {
+        rowData[variable] = parseFloat(row[variable]);
+      });
+      return rowData;
+    });
+  
+    const summaryStatistics = [];
+    
+    if (state.y) {
+      const yValues = selectedData.map((row) => row[state.y]);
+      summaryStatistics.push({
+        field_name: state.y,
+        mean_or_percentages: calculateMean(yValues),
+        standard_deviation: calculateStd(yValues),
+      });
+    }
+  
+    state.x
+    .filter((variable) => !state.c.includes(variable)) 
+    .forEach((variable) => {
+      const variableValues = selectedData.map((row) => row[variable]);
+      summaryStatistics.push({
+        field_name: variable,
+        mean_or_percentages: calculateMean(variableValues),
+        standard_deviation: calculateStd(variableValues),
+      });
+    });
+  
+    state.c.forEach((variable) => {
+      const variableValues = selectedData.map((row) => row[variable]);
+      const percentages = calculatePercentages(variableValues);
+      const categories = Object.keys(percentages);
+      categories.forEach((category) => {
+        summaryStatistics.push({
+          field_name: `${variable} - ${category}`,
+          mean_or_percentages: percentages[category],
+        });
+      });
+    });
+  
+    console.log('Summary Statistics:', summaryStatistics);
+    setState((prevState) => ({
+      ...prevState,
+      summaryStatistics: summaryStatistics,
+      showSummaryStat: true,
+    }));
+  };
+  
+  
+  const calculateCounts = (values) => {
+    const counts = {};
+    values.forEach((value) => {
+      counts[value] = (counts[value] || 0) + 1;
+    });
+    return counts;
+  };
+  
+  const calculatePercentages = (values) => {
+    const counts = calculateCounts(values);
+    const total = values.length;
+    const percentages = {};
+    Object.entries(counts).forEach(([category, count]) => {
+      percentages[category] = ((count / total) * 100).toFixed(3);
+    });
+    return percentages;
+  };
+  
+  const calculateMean = (values) => {
+    const validValues = values.filter((value) => !isNaN(value));
+    if (validValues.length === 0) {
+      return NaN; 
+    }
+    const sum = validValues.reduce((acc, val) => acc + val, 0);
+    const mean = sum / validValues.length;
+    return parseFloat(mean.toFixed(3)); // Limit to three decimal places
+  };
+  
+  const calculateStd = (values) => {
+    const validValues = values.filter((value) => !isNaN(value));
+    if (validValues.length <= 1) {
+      return NaN; 
+    }
+    const mean = calculateMean(validValues);
+    const squaredDiffs = validValues.map((val) => (val - mean) ** 2);
+    const variance = calculateMean(squaredDiffs);
+    const stdDev = Math.sqrt(variance);
+    return parseFloat(stdDev.toFixed(3)); // Limit to three decimal places
+  };
+  
+
+  
+  const filterData = ['actions', 'regions', 'regions - NaN'];
   return (
     <Box
       display="flex"
@@ -383,6 +487,15 @@ const FileUpload = () => {
           </FormControl>
         </Box>
         <ButtonContainer>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSummary}
+          style={{ width: '150px' }}
+        >
+          Summary Statistics
+        </Button>
+        <ButtonSpacer />
           <Button
             variant="contained"
             color="primary"
@@ -424,6 +537,26 @@ const FileUpload = () => {
             multicollinearity={state.multicollinearity}
             outliers_count={state.outliers_count}
             R2={state.R2}
+          />
+        </Box>
+      )}
+      {state.showSummaryStat && (
+        <Box
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginTop: '16px',
+            width: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <CustomTable
+            data={state.summaryStatistics}
+            filterData={filterData}
+            title={'Summary Statistics'}
+            itemsPerPage={25}
+            headers={['field_name', 'mean_or_percentages', 'standard_deviation']}
           />
         </Box>
       )}
