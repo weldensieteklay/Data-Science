@@ -150,9 +150,9 @@ const FileUpload = () => {
   };
 
   const handlePredict = () => {
-    const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar));
+    const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c===state.y;
     if (!isValidCategoricals) {
-      alert('Not all selected categorical variables are among the independent variables');
+      alert('Not selected categorical variables are among the dependent or independent variables');
       return;
     }
     const selectedData = state.data.map((row) => {
@@ -227,6 +227,11 @@ const FileUpload = () => {
   };
 
   const handleSummary = () => {
+    const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c===state.y;
+    if (!isValidCategoricals) {
+      alert('Not selected categorical variables are among the dependent or independent variables');
+      return;
+    }
     const selectedData = state.data.map((row) => {
       const rowData = {
         [state.id]: row[state.id],
@@ -240,7 +245,7 @@ const FileUpload = () => {
   
     const summaryStatistics = [];
     
-    if (state.y) {
+    if (state.y && !state.c.includes(state.y)) {
       const yValues = selectedData.map((row) => row[state.y]);
       summaryStatistics.push({
         field_name: state.y,
@@ -267,7 +272,7 @@ const FileUpload = () => {
       categories.forEach((category) => {
         summaryStatistics.push({
           field_name: `${variable} - ${category}`,
-          mean_or_percentages: percentages[category],
+          mean_or_percentages: percentages[category]+"%",
         });
       });
     });
