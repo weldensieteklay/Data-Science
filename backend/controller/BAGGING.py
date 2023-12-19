@@ -1,4 +1,5 @@
 from sklearn.ensemble import RandomForestRegressor, BaggingRegressor
+from sklearn.inspection import permutation_importance
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -56,14 +57,20 @@ def run_bagging_model():
         model = BaggingRegressor(base_estimator=base_estimator, n_estimators=10, random_state=42)
         results = model.fit(X_train, y_train)
 
+        # Calculate permutation importances
+        perm_importance = permutation_importance(results, X_test, y_test, n_repeats=10, random_state=42)
+
+        sorted_feature_importance = sorted(
+            zip(X.columns, perm_importance.importances_mean),
+            key=lambda x: x[1],
+            reverse=True
+        )
+
         y_pred = results.predict(X_test)
 
         squared_diff = (y_test - y_pred) ** 2
 
         mse = int(np.round(np.mean(squared_diff)))
-
-        feature_importance = results.estimators_[0].feature_importances_
-        sorted_feature_importance = sorted(feature_importance, key=lambda x: x[1], reverse=True)
 
         return jsonify({
             "mse": mse,

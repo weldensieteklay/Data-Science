@@ -22,7 +22,7 @@ const TreeCustomTable = ({ response, title }) => {
     <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '16px', width: '95%' }}>
       <Paper elevation={6} style={{ width: '95%', textAlign: 'center', marginBottom: '8px', padding: '16px' }}>
         <Typography variant="h6" gutterBottom style={{ fontWeight: 'bold', marginBottom: 25 }}>
-          {title && capitalizeFirstLetter(title) + "Results"}
+          {title && capitalizeFirstLetter(title) + " Results"}
         </Typography>
         <Box>
           <span style={{ marginRight: 20 }}><strong>MSE</strong>: {mse}</span>
