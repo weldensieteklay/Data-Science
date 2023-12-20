@@ -366,7 +366,7 @@ const FileUpload = () => {
             <InputLabel>Method</InputLabel>
             <Select
               value={state.machineLearningMethod}
-              onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value })}
+              onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value, showPredictResult:false })}
               style={{ minWidth: '100px' }}
             >
               {mlMethods.map((method) => (
