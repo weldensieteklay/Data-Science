@@ -207,6 +207,8 @@ const FileUpload = () => {
     setState((prevData) => ({
       ...prevData,
       [name]: value,
+      showSummaryStat: false,
+      showPredictResult: false,
     }));
   };
   const handleClear = () => {
@@ -214,6 +216,8 @@ const FileUpload = () => {
       ...prevState,
       y: '',
       x: [],
+      showSummaryStat: false,
+      showPredictResult: false,
     }));
   };
 
@@ -222,8 +226,9 @@ const FileUpload = () => {
     setState((prevState) => ({
       ...prevState,
       [v]: updatedX,
-      showSummaryStat: false
-    }));
+      showSummaryStat: false,
+      showPredictResult: false,
+      }));
   };
 
   const handleSummary = () => {
@@ -282,6 +287,7 @@ const FileUpload = () => {
       ...prevState,
       summaryStatistics: summaryStatistics,
       showSummaryStat: true,
+      showPredictResult: false,
     }));
   };
   
@@ -327,7 +333,7 @@ const FileUpload = () => {
   };
   
 
-  
+  console.log(state)
   const filterData = ['actions', 'regions', 'regions - NaN'];
   return (
     <Box
