@@ -332,9 +332,7 @@ const FileUpload = () => {
     return parseFloat(stdDev.toFixed(3)); // Limit to three decimal places
   };
   
-
-  console.log(state)
-  const filterData = ['actions', 'regions', 'regions - NaN'];
+ const filterData = ['actions', 'regions', 'regions - NaN'];
   return (
     <Box
       display="flex"
