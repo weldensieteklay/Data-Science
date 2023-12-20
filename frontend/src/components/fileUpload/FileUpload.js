@@ -46,7 +46,7 @@ const mlMethods = [...mlMethods1, ...mlMethods2];
 
 const initialState = {
   data: [],
-  machineLearningMethod: '',
+  machineLearningMethod: 'OLS',
   dependentVariable: [],
   independentVariables: [],
   predictionResult: [],
@@ -393,6 +393,7 @@ const FileUpload = () => {
 
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Independent Variables</InputLabel>
+            <div style={{ overflowX: 'auto' }}>
             <Select
               multiple
               value={state.x}
@@ -434,9 +435,11 @@ const FileUpload = () => {
                 </MenuItem>
               ))}
             </Select>
+            </div>
           </FormControl>
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Categorical Variables</InputLabel>
+            <div style={{ overflowX: 'auto' }}>
             <Select
               multiple
               value={state.c}
@@ -478,6 +481,7 @@ const FileUpload = () => {
                 </MenuItem>
               ))}
             </Select>
+            </div>
           </FormControl>
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Outliers</InputLabel>
