@@ -150,7 +150,7 @@ const FileUpload = () => {
   };
 
   const handlePredict = () => {
-    const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c===state.y;
+    const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c === state.y;
     if (!isValidCategoricals) {
       alert('Not selected categorical variables are among the dependent or independent variables');
       return;
@@ -228,28 +228,55 @@ const FileUpload = () => {
       [v]: updatedX,
       showSummaryStat: false,
       showPredictResult: false,
-      }));
+    }));
+  };
+
+  const calculatePercentages = (values) => {
+    if (typeof values[0] === 'string') {
+      return calculateCountsCategorical(values);
+    }
+    const counts = calculateCounts(values);
+    const total = values.length;
+    const percentages = {};
+    Object.entries(counts).forEach(([category, count]) => {
+      percentages[category] = ((count / total) * 100).toFixed(2);
+    });
+
+    return percentages;
+  };
+
+  const calculateCountsCategorical = (values) => {
+    const counts = {};
+    values.forEach((value) => {
+      counts[value] = (counts[value] || 0) + 1;
+    });
+    return counts;
   };
 
   const handleSummary = () => {
-    const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c===state.y;
+    const isValidCategoricals =
+      state.c.every((catVar) => state.x.includes(catVar)) || state.c === state.y;
     if (!isValidCategoricals) {
-      alert('Not selected categorical variables are among the dependent or independent variables');
+      alert(
+        'Not selected categorical variables are among the dependent or independent variables'
+      );
       return;
     }
+
     const selectedData = state.data.map((row) => {
       const rowData = {
         [state.id]: row[state.id],
         [state.y]: parseFloat(row[state.y]),
       };
+
       state.x.forEach((variable) => {
-        rowData[variable] = parseFloat(row[variable]);
+        rowData[variable] = isNaN(parseFloat(row[variable])) ? row[variable] : parseFloat(row[variable]);
       });
+
       return rowData;
     });
-  
+
     const summaryStatistics = [];
-    
     if (state.y && !state.c.includes(state.y)) {
       const yValues = selectedData.map((row) => row[state.y]);
       summaryStatistics.push({
@@ -258,31 +285,48 @@ const FileUpload = () => {
         standard_deviation: calculateStd(yValues),
       });
     }
-  
+
     state.x
-    .filter((variable) => !state.c.includes(variable)) 
-    .forEach((variable) => {
-      const variableValues = selectedData.map((row) => row[variable]);
-      summaryStatistics.push({
-        field_name: variable,
-        mean_or_percentages: calculateMean(variableValues),
-        standard_deviation: calculateStd(variableValues),
-      });
-    });
-  
-    state.c.forEach((variable) => {
-      const variableValues = selectedData.map((row) => row[variable]);
-      const percentages = calculatePercentages(variableValues);
-      const categories = Object.keys(percentages);
-      categories.forEach((category) => {
+      .filter((variable) => !state.c.includes(variable))
+      .forEach((variable) => {
+        const variableValues = selectedData.map((row) => row[variable]);
         summaryStatistics.push({
-          field_name: `${variable} - ${category}`,
-          mean_or_percentages: percentages[category]+"%",
+          field_name: variable,
+          mean_or_percentages: calculateMean(variableValues),
+          standard_deviation: calculateStd(variableValues),
         });
       });
+
+    state.c.forEach((variable) => {
+      const variableValues = selectedData.map((row) => row[variable]);
+      if (typeof variableValues[0] === 'string') {
+        const counts = calculateCountsCategorical(variableValues);
+        const total = variableValues.length;
+        const percentages = {};
+        Object.entries(counts).forEach(([category, count]) => {
+          percentages[category] = ((count / total) * 100).toFixed(3);
+        });
+        const categories = Object.keys(percentages);
+        categories.forEach((category) => {
+          summaryStatistics.push({
+            field_name: `${variable} - ${category}`,
+            mean_or_percentages: percentages[category] + '%',
+          });
+        });
+      } else {
+        const percentages = calculatePercentages(variableValues);
+        const categories = Object.keys(percentages);
+        categories.forEach((category) => {
+          summaryStatistics.push({
+            field_name: `${variable} - ${category}`,
+            mean_or_percentages: percentages[category] + '%',
+          });
+        });
+      }
     });
-  
+
     console.log('Summary Statistics:', summaryStatistics);
+
     setState((prevState) => ({
       ...prevState,
       summaryStatistics: summaryStatistics,
@@ -290,8 +334,6 @@ const FileUpload = () => {
       showPredictResult: false,
     }));
   };
-  
-  
   const calculateCounts = (values) => {
     const counts = {};
     values.forEach((value) => {
@@ -299,31 +341,21 @@ const FileUpload = () => {
     });
     return counts;
   };
-  
-  const calculatePercentages = (values) => {
-    const counts = calculateCounts(values);
-    const total = values.length;
-    const percentages = {};
-    Object.entries(counts).forEach(([category, count]) => {
-      percentages[category] = ((count / total) * 100).toFixed(3);
-    });
-    return percentages;
-  };
-  
+
   const calculateMean = (values) => {
     const validValues = values.filter((value) => !isNaN(value));
     if (validValues.length === 0) {
-      return NaN; 
+      return NaN;
     }
     const sum = validValues.reduce((acc, val) => acc + val, 0);
     const mean = sum / validValues.length;
     return parseFloat(mean.toFixed(3)); // Limit to three decimal places
   };
-  
+
   const calculateStd = (values) => {
     const validValues = values.filter((value) => !isNaN(value));
     if (validValues.length <= 1) {
-      return NaN; 
+      return NaN;
     }
     const mean = calculateMean(validValues);
     const squaredDiffs = validValues.map((val) => (val - mean) ** 2);
@@ -331,8 +363,8 @@ const FileUpload = () => {
     const stdDev = Math.sqrt(variance);
     return parseFloat(stdDev.toFixed(3)); // Limit to three decimal places
   };
-  
- const filterData = ['actions', 'regions', 'regions - NaN'];
+
+  const filterData = ['actions', 'regions', 'regions - NaN'];
   return (
     <Box
       display="flex"
@@ -366,7 +398,7 @@ const FileUpload = () => {
             <InputLabel>Method</InputLabel>
             <Select
               value={state.machineLearningMethod}
-              onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value, showPredictResult:false })}
+              onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value, showPredictResult: false })}
               style={{ minWidth: '100px' }}
             >
               {mlMethods.map((method) => (
@@ -394,93 +426,93 @@ const FileUpload = () => {
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Independent Variables</InputLabel>
             <div style={{ overflowX: 'auto' }}>
-            <Select
-              multiple
-              value={state.x}
-              onChange={(e) => handleInputChange('x', e.target.value)}
-              style={{ minWidth: '200px' }}
-              MenuProps={{
-                anchorOrigin: {
-                  vertical: 'bottom',
-                  horizontal: 'left',
-                },
-                transformOrigin: {
-                  vertical: 'top',
-                  horizontal: 'left',
-                },
-                getContentAnchorEl: null,
-                PaperProps: {
-                  style: {
-                    maxHeight: '200px',
+              <Select
+                multiple
+                value={state.x}
+                onChange={(e) => handleInputChange('x', e.target.value)}
+                style={{ minWidth: '200px' }}
+                MenuProps={{
+                  anchorOrigin: {
+                    vertical: 'bottom',
+                    horizontal: 'left',
                   },
-                },
-              }}
-              renderValue={() => (
-                <div>
-                  {state.x.map((variable) => (
-                    <Chip
-                      key={variable}
-                      label={variable}
-                      onDelete={() => removeVariable(variable, 'x')}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-                  ))}
-                </div>
-              )}
+                  transformOrigin: {
+                    vertical: 'top',
+                    horizontal: 'left',
+                  },
+                  getContentAnchorEl: null,
+                  PaperProps: {
+                    style: {
+                      maxHeight: '200px',
+                    },
+                  },
+                }}
+                renderValue={() => (
+                  <div>
+                    {state.x.map((variable) => (
+                      <Chip
+                        key={variable}
+                        label={variable}
+                        onDelete={() => removeVariable(variable, 'x')}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                    ))}
+                  </div>
+                )}
 
-            >
-              {state.independentVariables.map((variable) => (
-                <MenuItem key={variable} value={variable}>
-                  {variable}
-                </MenuItem>
-              ))}
-            </Select>
+              >
+                {state.independentVariables.map((variable) => (
+                  <MenuItem key={variable} value={variable}>
+                    {variable}
+                  </MenuItem>
+                ))}
+              </Select>
             </div>
           </FormControl>
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Categorical Variables</InputLabel>
             <div style={{ overflowX: 'auto' }}>
-            <Select
-              multiple
-              value={state.c}
-              onChange={(e) => handleInputChange('c', e.target.value)}
-              style={{ minWidth: '200px' }}
-              MenuProps={{
-                anchorOrigin: {
-                  vertical: 'bottom',
-                  horizontal: 'left',
-                },
-                transformOrigin: {
-                  vertical: 'top',
-                  horizontal: 'left',
-                },
-                getContentAnchorEl: null,
-                PaperProps: {
-                  style: {
-                    maxHeight: '200px',
+              <Select
+                multiple
+                value={state.c}
+                onChange={(e) => handleInputChange('c', e.target.value)}
+                style={{ minWidth: '200px' }}
+                MenuProps={{
+                  anchorOrigin: {
+                    vertical: 'bottom',
+                    horizontal: 'left',
                   },
-                },
-              }}
-              renderValue={() => (
-                <div>
-                  {state.c.map((variable) => (
-                    <Chip
-                      key={variable}
-                      label={variable}
-                      onDelete={() => removeVariable(variable, 'c')}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-                  ))}
-                </div>
-              )}
+                  transformOrigin: {
+                    vertical: 'top',
+                    horizontal: 'left',
+                  },
+                  getContentAnchorEl: null,
+                  PaperProps: {
+                    style: {
+                      maxHeight: '200px',
+                    },
+                  },
+                }}
+                renderValue={() => (
+                  <div>
+                    {state.c.map((variable) => (
+                      <Chip
+                        key={variable}
+                        label={variable}
+                        onDelete={() => removeVariable(variable, 'c')}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                    ))}
+                  </div>
+                )}
 
-            >
-              {state.independentVariables.map((variable) => (
-                <MenuItem key={variable} value={variable}>
-                  {variable}
-                </MenuItem>
-              ))}
-            </Select>
+              >
+                {state.independentVariables.map((variable) => (
+                  <MenuItem key={variable} value={variable}>
+                    {variable}
+                  </MenuItem>
+                ))}
+              </Select>
             </div>
           </FormControl>
           <FormControl style={{ marginLeft: '16px' }}>
@@ -500,15 +532,15 @@ const FileUpload = () => {
           </FormControl>
         </Box>
         <ButtonContainer>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSummary}
-          style={{ width: '150px' }}
-        >
-          Summary Statistics
-        </Button>
-        <ButtonSpacer />
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSummary}
+            style={{ width: '150px' }}
+          >
+            Summary Statistics
+          </Button>
+          <ButtonSpacer />
           <Button
             variant="contained"
             color="primary"
@@ -576,19 +608,19 @@ const FileUpload = () => {
       {
         state.showPredictResult && mlMethods2.includes(state.machineLearningMethod) && (
           <Box
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            marginTop: '16px',
-            width: '100%',
-            overflow: 'hidden',
-          }}
-        >
-          <TreeCustomTable
-            response={state.treeResponse}
-            title={state.machineLearningMethod}
-          />
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              marginTop: '16px',
+              width: '100%',
+              overflow: 'hidden',
+            }}
+          >
+            <TreeCustomTable
+              response={state.treeResponse}
+              title={state.machineLearningMethod}
+            />
           </Box>
         )
       }
