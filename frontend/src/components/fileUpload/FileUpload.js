@@ -40,7 +40,7 @@ const ButtonSpacer = styled(Box)(({ theme }) => ({
   marginLeft: '16px',
 }));
 
-const mlMethods1 = ['OLS', 'GLS', 'LASSO', 'RIDGE'];
+const mlMethods1 = ['OLS', 'GLS', 'LASSO', 'RIDGE', 'ARIMA'];
 const mlMethods2 = ['BOOSTING', 'BAGGING', 'RANDOM-FOREST', 'NEURAL_NETWORK'];
 const mlMethods = [...mlMethods1, ...mlMethods2];
 
@@ -409,8 +409,8 @@ const FileUpload = () => {
             </Select>
           </FormControl>
           <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>Dependent Variable</InputLabel>
-            <Select
+          <InputLabel>{state.machineLearningMethod === 'ARIMA'? 'Date':'dependent Variables'}</InputLabel>
+          <Select
               value={state.y}
               onChange={(e) => handleInputChange('y', e.target.value)}
               style={{ minWidth: '150px' }}
@@ -424,7 +424,7 @@ const FileUpload = () => {
           </FormControl>
 
           <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>Independent Variables</InputLabel>
+            <InputLabel>{state.machineLearningMethod === 'ARIMA'? 'Endogenous Variables':'Independent Variables'}</InputLabel>
             <div style={{ overflowX: 'auto' }}>
               <Select
                 multiple
@@ -469,6 +469,8 @@ const FileUpload = () => {
               </Select>
             </div>
           </FormControl>
+          {state.machineLearningMethod !== 'ARIMA' && 
+          <> 
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Categorical Variables</InputLabel>
             <div style={{ overflowX: 'auto' }}>
@@ -530,6 +532,8 @@ const FileUpload = () => {
               </MenuItem>
             </Select>
           </FormControl>
+          </>
+              }
         </Box>
         <ButtonContainer>
           <Button
@@ -537,6 +541,7 @@ const FileUpload = () => {
             color="primary"
             onClick={handleSummary}
             style={{ width: '150px' }}
+            disabled={state.data.length === 0 || state.y === ''}
           >
             Summary Statistics
           </Button>
@@ -546,6 +551,7 @@ const FileUpload = () => {
             color="primary"
             onClick={handlePredict}
             style={{ width: '150px' }}
+            disabled={state.data.length === 0 || state.y === ''}
           >
             Predict
           </Button>

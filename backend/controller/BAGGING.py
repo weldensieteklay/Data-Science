@@ -20,7 +20,7 @@ def run_bagging_model():
 
         actual_data = data['data']
         categorical_variables = data['categorical']
-        remove_outliers_flag = data['outliers'].lower() == 'yes'
+        remove_outliers_flag = data['outliers'].lower() == 'yes' 
 
         variable_names = list(actual_data[0].keys())
         dependent_variable_name = variable_names[1]
