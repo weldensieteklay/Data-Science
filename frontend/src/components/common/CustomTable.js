@@ -19,7 +19,6 @@ const capitalizeFirstLetter = (str) => {
 
 const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, R2, multicollinearity, heteroscedasticity, outliers_count }) => {
   const [currentPage, setCurrentPage] = useState(1);
-
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const slicedData = data.slice(startIndex, endIndex);

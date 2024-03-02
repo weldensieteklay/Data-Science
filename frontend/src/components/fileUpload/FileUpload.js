@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, Button, FormControl, InputLabel, Select, MenuItem, TextField, Chip } from '@mui/material';
+import { Box, Typography, Button, FormControl, Input, InputLabel, Select, MenuItem, TextField, Chip } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Papa from 'papaparse';
 import axios from 'axios';
 import CustomTable from '../common/CustomTable';
 import TreeCustomTable from '../common/TreeCustomTable';
+import TimeSeriesChart from '../graph/LineGraph';
 
 const StyledTitle = styled(Typography)(({ theme }) => ({
   color: 'white',
@@ -63,14 +64,18 @@ const initialState = {
   R2: null,
   treeResponse: null,
   summaryStatistics: [],
-  showSummaryStat: false
+  showSummaryStat: false,
+  showGraph: false,
+  dataGraph: [],
+  startDate: '',
+  endDate: '',
+  dateName: ''
 };
 
 
 const openDB = () => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open("IndexedDB", 1);
-
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       db.createObjectStore("csvFiles", { keyPath: "id", autoIncrement: true });
@@ -90,6 +95,9 @@ const openDB = () => {
 const FileUpload = () => {
   const [state, setState] = useState(initialState);
   const fileInputRef = useRef(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
 
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
@@ -150,6 +158,7 @@ const FileUpload = () => {
   };
 
   const handlePredict = () => {
+  
     const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c === state.y;
     if (!isValidCategoricals) {
       alert('Not selected categorical variables are among the dependent or independent variables');
@@ -157,7 +166,6 @@ const FileUpload = () => {
     }
     const selectedData = state.data.map((row) => {
       const rowData = {
-        [state.id]: row[state.id],
         [state.y]: row[state.y],
       };
       state.x.forEach((variable) => {
@@ -165,6 +173,7 @@ const FileUpload = () => {
       });
       return rowData;
     });
+
     const nonEmptySelectedData = selectedData.filter((rowData) => {
       return Object.values(rowData).every(value => value !== undefined && value !== null && value !== '');
     });
@@ -173,34 +182,48 @@ const FileUpload = () => {
     setState((prevState) => ({
       ...prevState,
       showPredictResult: false,
-      showSummaryStat: false
+      showSummaryStat: false,
+      showGraph: false
     }));
-    axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
-      .then(response => {
-        if (mlMethods2.includes(state.machineLearningMethod)) {
-          setState((prevState) => ({
-            ...prevState,
-            treeResponse: response.data,
-            showPredictResult: true,
-            showSummaryStat: false
-          }));
-        } else {
-          setState((prevState) => ({
-            ...prevState,
-            predictionResult: response.data.data,
-            showPredictResult: true,
-            mse: response.data.mse,
-            multicollinearity: response.data.multicollinearity,
-            heteroscedasticity: response.data.heteroscedasticity,
-            outliers_count: response.data.outliers_count,
-            R2: response.data.R2,
-            showSummaryStat: false
-          }));
-        }
-      })
-      .catch(err => {
-        console.log(err, 'Error in predict');
-      });
+
+    if (state.machineLearningMethod === 'ARIMA') {
+      const firstRowDate = new Date(data.data[0][state.y]);
+      if (isNaN(firstRowDate.getTime())) {
+        alert('The Date variable must be in a valid date format for ARIMA model');
+        return;
+      }
+  
+      if (state.x.length !== 1) {
+        alert('For ARIMA model, endogonous variable must be with exactly one variable');
+        return;
+      }
+    }
+    // axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
+    //   .then(response => {
+    //     if (mlMethods2.includes(state.machineLearningMethod)) {
+    //       setState((prevState) => ({
+    //         ...prevState,
+    //         treeResponse: response.data,
+    //         showPredictResult: true,
+    //         showSummaryStat: false
+    //       }));
+    //     } else {
+    //       setState((prevState) => ({
+    //         ...prevState,
+    //         predictionResult: response.data.data,
+    //         showPredictResult: true,
+    //         mse: response.data.mse,
+    //         multicollinearity: response.data.multicollinearity,
+    //         heteroscedasticity: response.data.heteroscedasticity,
+    //         outliers_count: response.data.outliers_count,
+    //         R2: response.data.R2,
+    //         showSummaryStat: false
+    //       }));
+    //     }
+    //   })
+    //   .catch(err => {
+    //     console.log(err, 'Error in predict');
+    //   });
   };
 
   const handleInputChange = (name, value) => {
@@ -209,6 +232,7 @@ const FileUpload = () => {
       [name]: value,
       showSummaryStat: false,
       showPredictResult: false,
+      showGraph:false,
     }));
   };
   const handleClear = () => {
@@ -218,6 +242,7 @@ const FileUpload = () => {
       x: [],
       showSummaryStat: false,
       showPredictResult: false,
+      showGraph: false
     }));
   };
 
@@ -228,6 +253,7 @@ const FileUpload = () => {
       [v]: updatedX,
       showSummaryStat: false,
       showPredictResult: false,
+      showGraph:false
     }));
   };
 
@@ -332,6 +358,7 @@ const FileUpload = () => {
       summaryStatistics: summaryStatistics,
       showSummaryStat: true,
       showPredictResult: false,
+      showGraph:false
     }));
   };
   const calculateCounts = (values) => {
@@ -363,8 +390,22 @@ const FileUpload = () => {
     const stdDev = Math.sqrt(variance);
     return parseFloat(stdDev.toFixed(3)); // Limit to three decimal places
   };
+const showGraph=()=>{
+  const startDateObj = new Date(state.startDate);
+  const endDateObj = new Date(state.endDate);
+  const filteredData = state.data.filter(item => {
+    const currentDate = new Date(item[state.y]);
+    return currentDate >= startDateObj && currentDate <= endDateObj;
+  });
+  setState((prevState) => ({
+    ...prevState,
+    showPredictResult: false,
+    showSummaryStat: false,
+    showGraph: true,
+    dataGraph:filteredData
+  }));}
 
-  const filterData = ['actions', 'regions', 'regions - NaN'];
+  const filterData = ['actions', 'regions', 'regions - NaN', state.dateName];
   return (
     <Box
       display="flex"
@@ -409,10 +450,10 @@ const FileUpload = () => {
             </Select>
           </FormControl>
           <FormControl style={{ marginLeft: '16px' }}>
-          <InputLabel>{state.machineLearningMethod === 'ARIMA'? 'Date':'dependent Variables'}</InputLabel>
+          <InputLabel>{state.machineLearningMethod === 'ARIMA'? 'Select Date Variable':'dependent Variables'}</InputLabel>
           <Select
-              value={state.y}
-              onChange={(e) => handleInputChange('y', e.target.value)}
+              value={state.dateName}
+              onChange={(e) => handleInputChange('dateName', e.target.value)}
               style={{ minWidth: '150px' }}
             >
               {state.dependentVariable.map((variable) => (
@@ -422,7 +463,38 @@ const FileUpload = () => {
               ))}
             </Select>
           </FormControl>
-
+          {state.machineLearningMethod === 'ARIMA' && (
+            <>
+              <FormControl style={{ marginLeft: '16px' }}>
+                <InputLabel>Start Date</InputLabel>
+                <Select
+                value={state.startDate}
+                onChange={(e) => handleInputChange('startDate', e.target.value)}
+                style={{ minWidth: '150px' }}
+              >
+              {state.data.map(item => (
+                <MenuItem key={item[state.y]} value={item[state.y]}>
+                  {item[state.y]}
+                </MenuItem>
+              ))}
+              </Select>
+              </FormControl>
+              <FormControl style={{ marginLeft: '16px' }}>
+                <InputLabel>End Date</InputLabel>
+                <Select
+                value={state.endDate}
+                onChange={(e) => handleInputChange('endDate', e.target.value)}
+                style={{ minWidth: '150px' }}
+              >
+              {state.data.map(item => (
+                <MenuItem key={item[state.dateName]} value={item[state.dateName]}>
+                  {item[state.dateName]}
+                </MenuItem>
+              ))}
+              </Select>
+              </FormControl>
+            </>
+          )}
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>{state.machineLearningMethod === 'ARIMA'? 'Endogenous Variables':'Independent Variables'}</InputLabel>
             <div style={{ overflowX: 'auto' }}>
@@ -541,17 +613,31 @@ const FileUpload = () => {
             color="primary"
             onClick={handleSummary}
             style={{ width: '150px' }}
-            disabled={state.data.length === 0 || state.y === ''}
+            disabled={state.data.length === 0 || state.dateName === ''}
           >
             Summary Statistics
           </Button>
           <ButtonSpacer />
+          {state.machineLearningMethod === 'ARIMA' && 
+          <>            
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={showGraph}
+            style={{ width: '150px' }}
+            disabled={state.data.length === 0 || state.dateName === ''}
+          >
+            Line Graph
+          </Button>
+          <ButtonSpacer /> 
+          </>
+        }
           <Button
             variant="contained"
             color="primary"
             onClick={handlePredict}
             style={{ width: '150px' }}
-            disabled={state.data.length === 0 || state.y === ''}
+            disabled={state.data.length === 0 || state.dateName === ''}
           >
             Predict
           </Button>
@@ -566,7 +652,48 @@ const FileUpload = () => {
           </Button>
         </ButtonContainer>
       </ContentWrapper>
+      {state.showGraph && state.machineLearningMethod ==='ARIMA' && (
+        <Box
+        style={{
+          alignItems: 'center',
+          marginTop: '16px',
+          width: '100%',
+          overflow: 'hidden',
+        }}
+      >
+        <TimeSeriesChart
+          data={state.dataGraph}
+          dateName={state.dateName}
+          targetVariables ={state.x}
+        />
+        </Box>
+    )}
       {state.showPredictResult && mlMethods1.includes(state.machineLearningMethod) && (
+        <Box
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginTop: '16px',
+            width: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <CustomTable
+            data={state.predictionResult}
+            mse={state.mse}
+            filterData={filterData}
+            title={state.machineLearningMethod + ' Results'}
+            itemsPerPage={25}
+            headers={['field_name', 'mean', 'standard_error', 'p_value']}
+            heteroscedasticity={state.heteroscedasticity}
+            multicollinearity={state.multicollinearity}
+            outliers_count={state.outliers_count}
+            R2={state.R2}
+          />
+        </Box>
+      )}
+        {state.showPredictResult && mlMethods1.includes(state.machineLearningMethod) && (
         <Box
           style={{
             display: 'flex',
