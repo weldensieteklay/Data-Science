@@ -36,7 +36,7 @@ def run_ols_model():
         data = request.get_json()
         if not data or 'data' not in data:
             return jsonify({'error': 'Invalid or missing data in the request'}), 400 
-
+       
         actual_data = data['data']
         categorical_variables = data['categorical']
         remove_outliers_flag = data['outliers'].lower() == 'yes'

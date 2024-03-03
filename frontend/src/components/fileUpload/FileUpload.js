@@ -95,9 +95,6 @@ const openDB = () => {
 const FileUpload = () => {
   const [state, setState] = useState(initialState);
   const fileInputRef = useRef(null);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-
 
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
@@ -166,7 +163,7 @@ const FileUpload = () => {
     }
     const selectedData = state.data.map((row) => {
       const rowData = {
-        [state.y]: row[state.y],
+        [state.dateName]: row[state.dateName],
       };
       state.x.forEach((variable) => {
         rowData[variable] = row[variable];
@@ -187,7 +184,8 @@ const FileUpload = () => {
     }));
 
     if (state.machineLearningMethod === 'ARIMA') {
-      const firstRowDate = new Date(data.data[0][state.y]);
+      console.log(data, selectedData)
+      const firstRowDate = new Date(data.data[0][state.dateName]);
       if (isNaN(firstRowDate.getTime())) {
         alert('The Date variable must be in a valid date format for ARIMA model');
         return;
@@ -198,32 +196,32 @@ const FileUpload = () => {
         return;
       }
     }
-    // axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
-    //   .then(response => {
-    //     if (mlMethods2.includes(state.machineLearningMethod)) {
-    //       setState((prevState) => ({
-    //         ...prevState,
-    //         treeResponse: response.data,
-    //         showPredictResult: true,
-    //         showSummaryStat: false
-    //       }));
-    //     } else {
-    //       setState((prevState) => ({
-    //         ...prevState,
-    //         predictionResult: response.data.data,
-    //         showPredictResult: true,
-    //         mse: response.data.mse,
-    //         multicollinearity: response.data.multicollinearity,
-    //         heteroscedasticity: response.data.heteroscedasticity,
-    //         outliers_count: response.data.outliers_count,
-    //         R2: response.data.R2,
-    //         showSummaryStat: false
-    //       }));
-    //     }
-    //   })
-    //   .catch(err => {
-    //     console.log(err, 'Error in predict');
-    //   });
+    axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
+      .then(response => {
+        if (mlMethods2.includes(state.machineLearningMethod)) {
+          setState((prevState) => ({
+            ...prevState,
+            treeResponse: response.data,
+            showPredictResult: true,
+            showSummaryStat: false
+          }));
+        } else {
+          setState((prevState) => ({
+            ...prevState,
+            predictionResult: response.data.data,
+            showPredictResult: true,
+            mse: response.data.mse,
+            multicollinearity: response.data.multicollinearity,
+            heteroscedasticity: response.data.heteroscedasticity,
+            outliers_count: response.data.outliers_count,
+            R2: response.data.R2,
+            showSummaryStat: false
+          }));
+        }
+      })
+      .catch(err => {
+        console.log(err, 'Error in predict');
+      });
   };
 
   const handleInputChange = (name, value) => {
@@ -473,8 +471,8 @@ const showGraph=()=>{
                 style={{ minWidth: '150px' }}
               >
               {state.data.map(item => (
-                <MenuItem key={item[state.y]} value={item[state.y]}>
-                  {item[state.y]}
+                <MenuItem key={item[state.dateName]} value={item[state.dateName]}>
+                  {item[state.dateName]}
                 </MenuItem>
               ))}
               </Select>

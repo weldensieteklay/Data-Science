@@ -8,6 +8,8 @@ from controller.BAGGING import run_bagging_model
 from controller.FOREST import run_random_forest_model
 from controller.BOOSTING import run_xgboost_model
 from controller.Neural_Network import run_neural_network_model
+from controller.ARIMA import predict_price
+
 routes = Blueprint('routes', __name__)
 
 # Define your routes using the imported functions
@@ -24,3 +26,4 @@ routes.route('/RANDOM-FOREST', methods=['POST'])(run_random_forest_model)
 routes.route('/BAGGING', methods=['POST'])(run_bagging_model)
 routes.route('/BOOSTING', methods=['POST'])(run_xgboost_model)
 routes.route('/NEURAL_NETWORK', methods=['POST'])(run_neural_network_model)
+routes.route('/ARIMA', methods=['POST'])(predict_price)
