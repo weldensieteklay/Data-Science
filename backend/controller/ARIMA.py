@@ -13,54 +13,64 @@ def is_valid_date(date_str):
 def predict_price():
     try:
         data = request.get_json()
-        actual_data = data.get('data')
-        date_column = data.get('date_column', 'Date')  # Default to 'Date' if not provided
-        endogenous_variable = data.get('endogenous_variable', 'india')  # Default to 'india' if not provided
+        actual_datas = data.get('data')
         
+        actual_data = [entry for entry in actual_datas if all(value not in ['', '0'] for value in entry.values())]
+        
+        if not actual_data:
+            return jsonify({'error': 'No valid data provided'}), 400
+
+        first_object = actual_data[0]
+        keys = list(first_object.keys())
+
+        date_column = None
+        endogenous_variable = None
+
+        for key in keys:
+            value = first_object[key] 
+            if is_valid_date(value):
+                date_column = key
+            else:
+                endogenous_variable = key
+
+        if date_column is None:
+            return jsonify({'error': 'Could not find suitable column name for the date variable'}), 400
+
+        if endogenous_variable is None:
+            return jsonify({'error': 'Could not find suitable column name for the endogenous variable'}), 400
+
         df = pd.DataFrame(actual_data)
 
-        # Convert data types
         df[date_column] = pd.to_datetime(df[date_column])
         df[endogenous_variable] = pd.to_numeric(df[endogenous_variable], errors='coerce')
 
-        # Sort DataFrame by date
         df.sort_values(by=date_column, inplace=True)
 
-        # Create lagged variables
         lagged_variable_names = [f"{endogenous_variable}_{i}" for i in range(1, 4)]
         for lag, lagged_variable_name in enumerate(lagged_variable_names, start=1):
             df[lagged_variable_name] = df[endogenous_variable].shift(lag)
 
-        # Drop rows with NaN values
         df.dropna(inplace=True)
 
-        # Prepare the time series data
         time_series = df.set_index(date_column)
 
-        # Split the data into training and testing sets
         split_index = int(len(time_series) * 0.8)
         train_data, test_data = time_series.iloc[:split_index], time_series.iloc[split_index:]
 
-        # Configure and fit the ARIMA model
         arima_model = ARIMA(train_data[endogenous_variable], order=(5, 1, 0))
         arima_results = arima_model.fit()
 
-        # Forecast using the ARIMA model
         forecast_values = arima_results.forecast(steps=len(test_data))
 
-        # Calculate Mean Squared Error (MSE)
         mse = int(np.round(np.mean((test_data[endogenous_variable] - forecast_values) ** 2)))
 
-        # Calculate AIC and BIC
         aic = arima_results.aic
         bic = arima_results.bic
 
-        # Extract coefficients, standard errors, and p-values
         mean = arima_results.params
         standard_error = arima_results.bse
         p_value = arima_results.pvalues
 
-        # Construct results dictionary
         results_dict = [
             {'field_name': 'constant', 'mean': f"{mean[0]:.3f}", 'standard_error': f"{standard_error[0]:.3f}",
              'p_value': f"{p_value[0]:.3f}"}

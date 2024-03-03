@@ -691,7 +691,7 @@ const showGraph=()=>{
           />
         </Box>
       )}
-        {state.showPredictResult && mlMethods1.includes(state.machineLearningMethod) && (
+        {state.showPredictResult && mlMethods2.includes(state.machineLearningMethod) && (
         <Box
           style={{
             display: 'flex',
