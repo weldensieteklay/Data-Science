@@ -44,6 +44,7 @@ const ButtonSpacer = styled(Box)(({ theme }) => ({
 const mlMethods1 = ['OLS', 'GLS', 'LASSO', 'RIDGE', 'ARIMA'];
 const mlMethods2 = ['BOOSTING', 'BAGGING', 'RANDOM-FOREST', 'NEURAL_NETWORK'];
 const mlMethods = [...mlMethods1, ...mlMethods2];
+const types = ['time-serious', 'non-time-serious']
 
 const initialState = {
   data: [],
@@ -69,7 +70,8 @@ const initialState = {
   dataGraph: [],
   startDate: '',
   endDate: '',
-  dateName: ''
+  dateName: '',
+  type: ''
 };
 
 
@@ -175,7 +177,7 @@ const FileUpload = () => {
       return Object.values(rowData).every(value => value !== undefined && value !== null && value !== '');
     });
 
-    const data = { data: nonEmptySelectedData, categorical: state.c, outliers: state.outliers };
+    const data = { data: nonEmptySelectedData, categorical: state.c, outliers: state.outliers, type:state.type };
     setState((prevState) => ({
       ...prevState,
       showPredictResult: false,
@@ -184,7 +186,6 @@ const FileUpload = () => {
     }));
 
     if (state.machineLearningMethod === 'ARIMA') {
-      console.log(data, selectedData)
       const firstRowDate = new Date(data.data[0][state.dateName]);
       if (isNaN(firstRowDate.getTime())) {
         alert('The Date variable must be in a valid date format for ARIMA model');
@@ -240,7 +241,9 @@ const FileUpload = () => {
       x: [],
       showSummaryStat: false,
       showPredictResult: false,
-      showGraph: false
+      showGraph: false,
+      type: '',
+      dateName: ''
     }));
   };
 
@@ -433,22 +436,46 @@ const showGraph=()=>{
             onChange={handleFileChange}
             style={{ width: '250px' }}
           />
+
           <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>Method</InputLabel>
+            <InputLabel>Type</InputLabel>
             <Select
-              value={state.machineLearningMethod}
-              onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value, showPredictResult: false })}
+              value={state.type}
+              onChange={(e) => setState({ ...state, type: e.target.value })}
               style={{ minWidth: '100px' }}
             >
-              {mlMethods.map((method) => (
-                <MenuItem key={method} value={method}>
-                  {method}
+              {types.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
+          {state.type? 
+            <>  
+
           <FormControl style={{ marginLeft: '16px' }}>
-          <InputLabel>{state.machineLearningMethod === 'ARIMA'? 'Select Date Variable':'dependent Variables'}</InputLabel>
+          <InputLabel>Method</InputLabel>
+          <Select
+            value={state.machineLearningMethod}
+            onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value, showPredictResult: false })}
+            style={{ minWidth: '100px' }}
+          >
+            {state.type === 'time-serious'? [...mlMethods.slice(2)].map((method) => (
+              <MenuItem key={method} value={method}>
+                {method}
+              </MenuItem>
+            )): [...mlMethods.pop()].map((method) => (
+              <MenuItem key={method} value={method}>
+                {method}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+
+          <FormControl style={{ marginLeft: '16px' }}>
+          <InputLabel>{state.type === 'time-serious'? 'Select Date Variable':'dependent Variables'}</InputLabel>
           <Select
               value={state.dateName}
               onChange={(e) => handleInputChange('dateName', e.target.value)}
@@ -461,7 +488,7 @@ const showGraph=()=>{
               ))}
             </Select>
           </FormControl>
-          {state.machineLearningMethod === 'ARIMA' && (
+          {state.type === 'time-serious' && (
             <>
               <FormControl style={{ marginLeft: '16px' }}>
                 <InputLabel>Start Date</InputLabel>
@@ -493,14 +520,15 @@ const showGraph=()=>{
               </FormControl>
             </>
           )}
+
           <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>{state.machineLearningMethod === 'ARIMA'? 'Endogenous Variables':'Independent Variables'}</InputLabel>
+            <InputLabel>{state.type === 'time-serious'? 'Endogenous Variables':'Independent Variables'}</InputLabel>
             <div style={{ overflowX: 'auto' }}>
               <Select
                 multiple
                 value={state.x}
                 onChange={(e) => handleInputChange('x', e.target.value)}
-                style={{ minWidth: '200px' }}
+                style={{ minWidth: '150px' }}
                 MenuProps={{
                   anchorOrigin: {
                     vertical: 'bottom',
@@ -539,7 +567,8 @@ const showGraph=()=>{
               </Select>
             </div>
           </FormControl>
-          {state.machineLearningMethod !== 'ARIMA' && 
+
+          {state.type !== 'time-serious' && 
           <> 
           <FormControl style={{ marginLeft: '16px' }}>
             <InputLabel>Categorical Variables</InputLabel>
@@ -548,7 +577,7 @@ const showGraph=()=>{
                 multiple
                 value={state.c}
                 onChange={(e) => handleInputChange('c', e.target.value)}
-                style={{ minWidth: '200px' }}
+                style={{ minWidth: '150px' }}
                 MenuProps={{
                   anchorOrigin: {
                     vertical: 'bottom',
@@ -603,8 +632,12 @@ const showGraph=()=>{
             </Select>
           </FormControl>
           </>
-              }
+           }
+           </>:null}  
         </Box>
+       
+
+
         <ButtonContainer>
           <Button
             variant="contained"
@@ -616,14 +649,14 @@ const showGraph=()=>{
             Summary Statistics
           </Button>
           <ButtonSpacer />
-          {state.machineLearningMethod === 'ARIMA' && 
+          {state.type === 'time-serious' && 
           <>            
           <Button
             variant="contained"
             color="primary"
             onClick={showGraph}
             style={{ width: '150px' }}
-            disabled={state.data.length === 0 || state.dateName === ''}
+            disabled={state.type === '' || state.data.length === 0 || state.dateName === ''}
           >
             Line Graph
           </Button>
@@ -635,7 +668,7 @@ const showGraph=()=>{
             color="primary"
             onClick={handlePredict}
             style={{ width: '150px' }}
-            disabled={state.data.length === 0 || state.dateName === ''}
+            disabled={state.type === '' || state.data.length === 0 || state.dateName === ''}
           >
             Predict
           </Button>
@@ -649,6 +682,7 @@ const showGraph=()=>{
             Clear
           </Button>
         </ButtonContainer>
+
       </ContentWrapper>
       {state.showGraph && state.machineLearningMethod ==='ARIMA' && (
         <Box
@@ -667,31 +701,6 @@ const showGraph=()=>{
         </Box>
     )}
       {state.showPredictResult && mlMethods1.includes(state.machineLearningMethod) && (
-        <Box
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            marginTop: '16px',
-            width: '100%',
-            overflow: 'hidden',
-          }}
-        >
-          <CustomTable
-            data={state.predictionResult}
-            mse={state.mse}
-            filterData={filterData}
-            title={state.machineLearningMethod + ' Results'}
-            itemsPerPage={25}
-            headers={['field_name', 'mean', 'standard_error', 'p_value']}
-            heteroscedasticity={state.heteroscedasticity}
-            multicollinearity={state.multicollinearity}
-            outliers_count={state.outliers_count}
-            R2={state.R2}
-          />
-        </Box>
-      )}
-        {state.showPredictResult && mlMethods2.includes(state.machineLearningMethod) && (
         <Box
           style={{
             display: 'flex',

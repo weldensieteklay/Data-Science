@@ -21,9 +21,9 @@ const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, R2, 
   const [currentPage, setCurrentPage] = useState(1);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
+  console.log(data, 'wwwwww')
   const slicedData = data.slice(startIndex, endIndex);
   const totalPages = Math.ceil(data.length / itemsPerPage);
-
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
   };
@@ -56,8 +56,8 @@ const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, R2, 
               </TableRow>
             </TableHead>
             <TableBody>
-              {slicedData.length > 0 ? (
-                slicedData.map((item, index) => (
+              {slicedData?.length > 0 ? (
+                slicedData?.map((item, index) => (
                   <TableRow
                     key={index} 
                     style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f3f3f3' }}
