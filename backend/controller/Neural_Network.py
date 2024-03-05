@@ -188,7 +188,6 @@ def run_time_series_lstm_model(data):
         TIME_STEPS = 3
         X_train, y_train = create_dataset(train_data_scaled, train_data_scaled[:, 0], TIME_STEPS)
         X_test, y_test = create_dataset(test_data_scaled, test_data_scaled[:, 0], TIME_STEPS)
-
         model = Sequential()
         model.add(LSTM(units=64, input_shape=(X_train.shape[1], X_train.shape[2])))
         model.add(Dense(units=1))
@@ -205,7 +204,7 @@ def run_time_series_lstm_model(data):
 
         mse = model.evaluate(X_test, y_test, verbose=0)
 
-        feature_names = time_series.columns.tolist()  # Get the list of feature names
+        feature_names = time_series.drop(endogenous_variable, axis=1).columns.tolist()  # Exclude endogenous variable
         feature_importance = extract_feature_importance(model, feature_names)  # Pass feature names to extract_feature_importance
 
         sorted_feature_importance = convert_to_json_serializable(feature_importance)
