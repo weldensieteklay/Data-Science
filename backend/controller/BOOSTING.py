@@ -5,6 +5,13 @@ from flask import jsonify, request
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBRegressor
 
+def is_valid_date(date_str):
+    try:
+        pd.to_datetime(date_str)
+        return True
+    except ValueError:
+        return False
+    
 def remove_outliers(df, columns, z_threshold=3):
     before_outliers = len(df)
     df = df[(np.abs(df[columns]) < z_threshold).all(axis=1)]
@@ -17,6 +24,18 @@ def run_xgboost_model():
         if not data or 'data' not in data:
             return jsonify({'error': 'Invalid or missing data in the request'}), 400 
 
+        type = data.get('type')
+
+        if type == 'time-serious':
+            return run_time_series_xgboost_model(data)
+        else:
+            return run_non_time_series_xgboost_model(data)
+
+    except Exception as e:
+        return jsonify({'error': repr(e)}), 500
+    
+def run_non_time_series_xgboost_model(data):
+    try:
         actual_data = data['data']
         categorical_variables = data['categorical']
         remove_outliers_flag = data['outliers'].lower() == 'yes'
@@ -51,7 +70,6 @@ def run_xgboost_model():
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 
-        # Use XGBRegressor for boosting
         model = XGBRegressor(n_estimators=100, random_state=42)
         results = model.fit(X_train, y_train)
 
@@ -61,11 +79,9 @@ def run_xgboost_model():
 
         mse = int(np.round(np.mean(squared_diff)))
 
-        # XGBoost provides feature importance directly
         feature_importance = results.feature_importances_
         sorted_feature_importance = sorted(zip(X.columns, feature_importance), key=lambda item: item[1], reverse=True)
 
-        # Convert float32 to float for JSON serialization
         sorted_feature_importance = [{"feature": feature, "importance": float(importance)} for feature, importance in sorted_feature_importance]
 
         return jsonify({
@@ -76,4 +92,75 @@ def run_xgboost_model():
 
     except Exception as e:
         print(f"An error occurred: {repr(e)}")  
+        return jsonify({'error': repr(e)}), 500
+
+
+def run_time_series_xgboost_model(data):
+    try:
+        actual_datas = data.get('data')
+        
+        actual_data = [entry for entry in actual_datas if all(value not in ['', '0'] for value in entry.values())]
+        
+        if not actual_data:
+            return jsonify({'error': 'No valid data provided'}), 400
+
+        first_object = actual_data[0]
+        keys = list(first_object.keys())
+
+        date_column = None
+        endogenous_variable = None
+
+        for key in keys:
+            value = first_object[key] 
+            if is_valid_date(value):
+                date_column = key
+            else:
+                endogenous_variable = key
+
+        if date_column is None:
+            return jsonify({'error': 'Could not find suitable column name for the date variable'}), 400
+
+        if endogenous_variable is None:
+            return jsonify({'error': 'Could not find suitable column name for the endogenous variable'}), 400
+
+        df = pd.DataFrame(actual_data)
+
+        df[date_column] = pd.to_datetime(df[date_column])
+        df[endogenous_variable] = pd.to_numeric(df[endogenous_variable], errors='coerce')
+
+        df.sort_values(by=date_column, inplace=True)
+
+        lagged_variable_names = [f"{endogenous_variable}_{i}" for i in range(1, 4)]
+        for lag, lagged_variable_name in enumerate(lagged_variable_names, start=1):
+            df[lagged_variable_name] = df[endogenous_variable].shift(lag)
+
+        df.dropna(inplace=True)
+
+        time_series = df.set_index(date_column)
+
+        split_index = int(len(time_series) * 0.8)
+        train_data, test_data = time_series.iloc[:split_index], time_series.iloc[split_index:]
+
+        X_train = train_data.drop(columns=[endogenous_variable])
+        y_train = train_data[endogenous_variable]
+
+        X_test = test_data.drop(columns=[endogenous_variable])
+        y_test = test_data[endogenous_variable]
+
+        model = XGBRegressor(n_estimators=100, random_state=42)
+        results = model.fit(X_train, y_train)
+        mse = int(np.round(np.mean((results.predict(X_test) - y_test) ** 2)))
+
+        feature_importance = results.feature_importances_
+        sorted_feature_importance = sorted(zip(X_train.columns, feature_importance), key=lambda item: item[1], reverse=True)
+
+        sorted_feature_importance = [{"feature": feature, "importance": float(importance)} for feature, importance in sorted_feature_importance]
+
+        return jsonify({
+            "mse": mse,
+            "feature_importance": sorted_feature_importance,
+        })
+   
+        
+    except Exception as e:
         return jsonify({'error': repr(e)}), 500

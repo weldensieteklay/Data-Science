@@ -4,8 +4,45 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
-import json
+from tensorflow.keras.layers import LSTM, Dense
+from sklearn.preprocessing import MinMaxScaler
+
+
+def is_valid_date(date_str):
+    try:
+        pd.to_datetime(date_str)
+        return True
+    except ValueError:
+        return False
+    
+def remove_outliers(df, columns, z_threshold=3):
+    before_outliers = len(df)
+    df = df[(np.abs(df[columns]) < z_threshold).all(axis=1)]
+    after_outliers = len(df)
+    return df, before_outliers - after_outliers
+
+    
+def extract_feature_importance(model, input_features):
+    layer_weights = model.layers[0].get_weights()[0]
+    feature_importance = np.abs(layer_weights).sum(axis=1) / np.sum(np.abs(layer_weights))
+    return list(zip(input_features, feature_importance))
+
+def run_neural_network_model():
+    try:
+        data = request.get_json()
+        if not data or 'data' not in data:
+            return jsonify({'error': 'Invalid or missing data in the request'}), 400 
+
+        type = data.get('type')
+
+        if type == 'time-serious':
+            return run_time_series_lstm_model(data)
+        else:
+            return non_time_series_neural_network__model(data)
+
+    except Exception as e:
+        return jsonify({'error': repr(e)}), 500
+    
 
 def convert_to_json_serializable(data):
     if isinstance(data, (np.ndarray, np.float32, np.float64)):
@@ -20,24 +57,8 @@ def convert_to_json_serializable(data):
         return data
 
 
-    
-def remove_outliers(df, columns, z_threshold=3):
-    before_outliers = len(df)
-    df = df[(np.abs(df[columns]) < z_threshold).all(axis=1)]
-    after_outliers = len(df)
-    return df, before_outliers - after_outliers
-
-def extract_feature_importance(model, input_features):
-    layer_weights = model.layers[0].get_weights()[0]
-    feature_importance = np.abs(layer_weights).sum(axis=1) / np.sum(np.abs(layer_weights))
-    return list(zip(input_features, feature_importance))
-
-def run_neural_network_model():
+def non_time_series_neural_network__model(data):
     try:
-        data = request.get_json()
-        if not data or 'data' not in data:
-            return jsonify({'error': 'Invalid or missing data in the request'}), 400
-
         actual_data = data['data']
         categorical_variables = data['categorical']
         remove_outliers_flag = data['outliers'].lower() == 'yes'
@@ -104,3 +125,98 @@ def run_neural_network_model():
     except Exception as e:
         print(f"An error occurred: {repr(e)}")
         return jsonify({'error': repr(e)}), 500
+
+
+def run_time_series_lstm_model(data):
+    try:
+        actual_datas = data.get('data')
+        
+        actual_data = [entry for entry in actual_datas if all(value not in ['', '0'] for value in entry.values())]
+        
+        if not actual_data:
+            return jsonify({'error': 'No valid data provided'}), 400
+
+        first_object = actual_data[0]
+        keys = list(first_object.keys())
+
+        date_column = None
+        endogenous_variable = None
+
+        for key in keys:
+            value = first_object[key] 
+            if is_valid_date(value):
+                date_column = key
+            else:
+                endogenous_variable = key
+
+        if date_column is None:
+            return jsonify({'error': 'Could not find suitable column name for the date variable'}), 400
+
+        if endogenous_variable is None:
+            return jsonify({'error': 'Could not find suitable column name for the endogenous variable'}), 400
+
+        df = pd.DataFrame(actual_data)
+
+        df[date_column] = pd.to_datetime(df[date_column])
+        df[endogenous_variable] = pd.to_numeric(df[endogenous_variable], errors='coerce')
+
+        df.sort_values(by=date_column, inplace=True)
+
+        lagged_variable_names = [f"{endogenous_variable}_{i}" for i in range(1, 4)]
+        for lag, lagged_variable_name in enumerate(lagged_variable_names, start=1):
+            df[lagged_variable_name] = df[endogenous_variable].shift(lag)
+
+        df.dropna(inplace=True)
+
+        time_series = df.set_index(date_column)
+
+        split_index = int(len(time_series) * 0.8)
+        train_data, test_data = time_series.iloc[:split_index], time_series.iloc[split_index:]
+
+        scaler = MinMaxScaler()
+        train_data_scaled = scaler.fit_transform(train_data)
+        test_data_scaled = scaler.transform(test_data)
+
+        def create_dataset(X, y, time_steps=1):
+            Xs, ys = [], []
+            for i in range(len(X) - time_steps):
+                v = X[i:(i + time_steps)]
+                Xs.append(v)
+                ys.append(y[i + time_steps])
+            return np.array(Xs), np.array(ys)
+
+        TIME_STEPS = 3
+        X_train, y_train = create_dataset(train_data_scaled, train_data_scaled[:, 0], TIME_STEPS)
+        X_test, y_test = create_dataset(test_data_scaled, test_data_scaled[:, 0], TIME_STEPS)
+
+        model = Sequential()
+        model.add(LSTM(units=64, input_shape=(X_train.shape[1], X_train.shape[2])))
+        model.add(Dense(units=1))
+        model.compile(optimizer='adam', loss='mean_squared_error')
+
+        history = model.fit(
+            X_train, y_train,
+            epochs=100,
+            batch_size=16,
+            validation_split=0.1,
+            verbose=0,
+            shuffle=False
+        )
+
+        mse = model.evaluate(X_test, y_test, verbose=0)
+
+        feature_names = time_series.columns.tolist()  # Get the list of feature names
+        feature_importance = extract_feature_importance(model, feature_names)  # Pass feature names to extract_feature_importance
+
+        sorted_feature_importance = convert_to_json_serializable(feature_importance)
+        new_feature_importance = [{"feature": feature, "importance": importance} for feature, importance in sorted_feature_importance]
+
+        return jsonify({
+            "mse": mse,
+            "feature_importance": new_feature_importance,
+            # "history": history.history
+        })
+
+    except Exception as e:
+        return jsonify({'error': repr(e)}), 500
+   
