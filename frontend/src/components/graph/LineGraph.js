@@ -53,6 +53,9 @@ const TimeSeriesChart = ({ data, dateName, targetVariables }) => {
           }
         }
       });
+
+      // Dynamically adjust canvas width based on the number of data points
+      chartRef.current.width = Math.max(600, sortedData.length * 30);
     }
   }, [data, dateName, targetVariables]);
 
@@ -70,7 +73,7 @@ const TimeSeriesChart = ({ data, dateName, targetVariables }) => {
   };
 
   return (
-    <Box sx={{marginLeft: '50px', marginRight: '50px'}}>
+    <Box sx={{ marginLeft: '50px', marginRight: '50px' }}>
       <canvas ref={chartRef} />
     </Box>
   );

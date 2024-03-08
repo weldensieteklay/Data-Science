@@ -392,10 +392,21 @@ const FileUpload = () => {
     return parseFloat(stdDev.toFixed(3)); // Limit to three decimal places
   };
 const showGraph=()=>{
+   if (!state.startDate || !state.endDate) {
+    alert("Please provide valid start and end dates.");
+    return; 
+  }
+
   const startDateObj = new Date(state.startDate);
   const endDateObj = new Date(state.endDate);
+
+  if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+    alert("Please provide valid start and end dates.");
+    return; 
+  }
+ 
   const filteredData = state.data.filter(item => {
-    const currentDate = new Date(item[state.y]);
+    const currentDate = new Date(item[state.dateName]);
     return currentDate >= startDateObj && currentDate <= endDateObj;
   });
   setState((prevState) => ({
@@ -465,7 +476,7 @@ const showGraph=()=>{
               <MenuItem key={method} value={method}>
                 {method}
               </MenuItem>
-            )): [...mlMethods.pop()].map((method) => (
+            )): mlMethods.filter(elem=>elem !== 'ARIMA').map((method) => (
               <MenuItem key={method} value={method}>
                 {method}
               </MenuItem>
@@ -760,6 +771,7 @@ const showGraph=()=>{
             <TreeCustomTable
               response={state.treeResponse}
               title={state.machineLearningMethod}
+              type={state.type}
             />
           </Box>
         )

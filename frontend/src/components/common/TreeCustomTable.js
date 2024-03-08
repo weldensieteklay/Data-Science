@@ -15,7 +15,7 @@ const capitalizeFirstLetter = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const TreeCustomTable = ({ response, title }) => {
+const TreeCustomTable = ({ response, title, type }) => {
   const { feature_importance, mse, outliers_count } = response;
 
   return (
@@ -26,7 +26,7 @@ const TreeCustomTable = ({ response, title }) => {
         </Typography>
         <Box>
           <span style={{ marginRight: 20 }}><strong>MSE</strong>: {mse}</span>
-          <span><strong>Outliers Count</strong>: {outliers_count}</span>
+         { type !== "time-serious"? <span><strong>Outliers Count</strong>: {outliers_count}</span>:null}
         </Box>
       </Paper>
       <Paper elevation={3} style={{ width: '95%', overflowX: 'auto', margin: 'auto' }}>

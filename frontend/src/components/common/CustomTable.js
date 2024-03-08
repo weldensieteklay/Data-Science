@@ -21,7 +21,6 @@ const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, R2, 
   const [currentPage, setCurrentPage] = useState(1);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  console.log(data, 'wwwwww')
   const slicedData = data.slice(startIndex, endIndex);
   const totalPages = Math.ceil(data.length / itemsPerPage);
   const handlePageChange = (newPage) => {
