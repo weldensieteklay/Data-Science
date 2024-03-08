@@ -17,7 +17,7 @@ const capitalizeFirstLetter = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const CustomTable = ({ data, filterData, title, itemsPerPage, headers, mse, R2, multicollinearity, heteroscedasticity, outliers_count }) => {
+const CustomTable = ({ data = [], filterData, title, itemsPerPage, headers, mse, R2, multicollinearity, heteroscedasticity, outliers_count }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;

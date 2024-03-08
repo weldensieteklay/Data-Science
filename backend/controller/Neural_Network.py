@@ -202,7 +202,8 @@ def run_time_series_lstm_model(data):
             shuffle=False
         )
 
-        mse = model.evaluate(X_test, y_test, verbose=0)
+        mse = round(model.evaluate(X_test, y_test, verbose=0), 3)
+
 
         feature_names = time_series.drop(endogenous_variable, axis=1).columns.tolist()  # Exclude endogenous variable
         feature_importance = extract_feature_importance(model, feature_names)  # Pass feature names to extract_feature_importance
@@ -213,7 +214,7 @@ def run_time_series_lstm_model(data):
         return jsonify({
             "mse": mse,
             "feature_importance": new_feature_importance,
-            # "history": history.history
+            "history": history.history
         })
 
     except Exception as e:

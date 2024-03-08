@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import CircularProgress from '@mui/material/CircularProgress';
 import { Box, Typography, Button, FormControl, Input, InputLabel, Select, MenuItem, TextField, Chip } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Papa from 'papaparse';
@@ -97,6 +98,7 @@ const openDB = () => {
 const FileUpload = () => {
   const [state, setState] = useState(initialState);
   const fileInputRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
@@ -157,7 +159,7 @@ const FileUpload = () => {
   };
 
   const handlePredict = () => {
-  
+    setIsLoading(true); 
     const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c === state.y;
     if (!isValidCategoricals) {
       alert('Not selected categorical variables are among the dependent or independent variables');
@@ -199,6 +201,7 @@ const FileUpload = () => {
     }
     axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
       .then(response => {
+        setIsLoading(false); 
         if (mlMethods2.includes(state.machineLearningMethod)) {
           setState((prevState) => ({
             ...prevState,
@@ -221,6 +224,7 @@ const FileUpload = () => {
         }
       })
       .catch(err => {
+        setIsLoading(false); 
         console.log(err, 'Error in predict');
       });
   };
@@ -695,6 +699,9 @@ const showGraph=()=>{
         </ButtonContainer>
 
       </ContentWrapper>
+      <Box>
+      {isLoading && <CircularProgress />}
+    </Box>
       {state.showGraph && state.machineLearningMethod ==='ARIMA' && (
         <Box
         style={{
