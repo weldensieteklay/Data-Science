@@ -45,7 +45,7 @@ const ButtonSpacer = styled(Box)(({ theme }) => ({
 const mlMethods1 = ['OLS', 'GLS', 'LASSO', 'RIDGE', 'ARIMA'];
 const mlMethods2 = ['BOOSTING', 'BAGGING', 'RANDOM-FOREST', 'NEURAL_NETWORK'];
 const mlMethods = [...mlMethods1, ...mlMethods2];
-const types = ['time-serious', 'non-time-serious']
+const types = ['time-serious', 'cross-sectional', 'panel']
 
 const initialState = {
   data: [],
@@ -150,25 +150,41 @@ const FileUpload = () => {
   }, []);
 
 
-
   const saveToIndexedDB = async (data) => {
     const db = await openDB();
     const transaction = db.transaction("csvFiles", "readwrite");
     const csvFileStore = transaction.objectStore("csvFiles");
-    csvFileStore.add({ data });
+    const existingFile = await csvFileStore.get(1);
+
+    if (existingFile) {
+      existingFile.data = data;
+      csvFileStore.put(existingFile);
+    } else {
+      csvFileStore.add({ data });
+    }
   };
 
+
   const handlePredict = () => {
-    setIsLoading(true); 
+    setIsLoading(true);
     const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c === state.y;
     if (!isValidCategoricals) {
       alert('Not selected categorical variables are among the dependent or independent variables');
       return;
     }
+    if (state.type !== 'time-serious' && !state.id) {
+      alert('Select an ID. It is required field for non-time serious prediction');
+      return;
+    }
     const selectedData = state.data.map((row) => {
-      const rowData = {
-        [state.dateName]: row[state.dateName],
-      };
+      let rowData = {};
+      if (state.type === 'time-serious') {
+        rowData[state.dateName] = row[state.dateName]
+      } else {
+        rowData[state.id] = row[state.id]
+        rowData[state.y] = row[state.y]
+
+      }
       state.x.forEach((variable) => {
         rowData[variable] = row[variable];
       });
@@ -179,7 +195,7 @@ const FileUpload = () => {
       return Object.values(rowData).every(value => value !== undefined && value !== null && value !== '');
     });
 
-    const data = { data: nonEmptySelectedData, categorical: state.c, outliers: state.outliers, type:state.type };
+    const data = { data: nonEmptySelectedData, categorical: state.c, outliers: state.outliers, type: state.type };
     setState((prevState) => ({
       ...prevState,
       showPredictResult: false,
@@ -193,7 +209,7 @@ const FileUpload = () => {
         alert('The Date variable must be in a valid date format for ARIMA model');
         return;
       }
-  
+
       if (state.x.length !== 1) {
         alert('For ARIMA model, endogonous variable must be with exactly one variable');
         return;
@@ -201,7 +217,7 @@ const FileUpload = () => {
     }
     axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
       .then(response => {
-        setIsLoading(false); 
+        setIsLoading(false);
         if (mlMethods2.includes(state.machineLearningMethod)) {
           setState((prevState) => ({
             ...prevState,
@@ -224,7 +240,7 @@ const FileUpload = () => {
         }
       })
       .catch(err => {
-        setIsLoading(false); 
+        setIsLoading(false);
         console.log(err, 'Error in predict');
       });
   };
@@ -235,7 +251,7 @@ const FileUpload = () => {
       [name]: value,
       showSummaryStat: false,
       showPredictResult: false,
-      showGraph:false,
+      showGraph: false,
     }));
   };
   const handleClear = () => {
@@ -258,7 +274,7 @@ const FileUpload = () => {
       [v]: updatedX,
       showSummaryStat: false,
       showPredictResult: false,
-      showGraph:false
+      showGraph: false
     }));
   };
 
@@ -363,7 +379,7 @@ const FileUpload = () => {
       summaryStatistics: summaryStatistics,
       showSummaryStat: true,
       showPredictResult: false,
-      showGraph:false
+      showGraph: false
     }));
   };
   const calculateCounts = (values) => {
@@ -381,7 +397,7 @@ const FileUpload = () => {
     }
     const sum = validValues.reduce((acc, val) => acc + val, 0);
     const mean = sum / validValues.length;
-    return parseFloat(mean.toFixed(3)); // Limit to three decimal places
+    return parseFloat(mean.toFixed(3));
   };
 
   const calculateStd = (values) => {
@@ -395,31 +411,33 @@ const FileUpload = () => {
     const stdDev = Math.sqrt(variance);
     return parseFloat(stdDev.toFixed(3)); // Limit to three decimal places
   };
-const showGraph=()=>{
-   if (!state.startDate || !state.endDate) {
-    alert("Please provide valid start and end dates.");
-    return; 
-  }
+  const showGraph = () => {
+    if (!state.startDate || !state.endDate) {
+      alert("Please provide valid start and end dates.");
+      return;
+    }
 
-  const startDateObj = new Date(state.startDate);
-  const endDateObj = new Date(state.endDate);
+    const startDateObj = new Date(state.startDate);
+    const endDateObj = new Date(state.endDate);
 
-  if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
-    alert("Please provide valid start and end dates.");
-    return; 
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      alert("Please provide valid start and end dates.");
+      return;
+    }
+
+    const filteredData = state.data.filter(item => {
+      const currentDate = new Date(item[state.dateName]);
+      return currentDate >= startDateObj && currentDate <= endDateObj;
+    });
+
+    setState((prevState) => ({
+      ...prevState,
+      showPredictResult: false,
+      showSummaryStat: false,
+      showGraph: true,
+      dataGraph: filteredData
+    }));
   }
- 
-  const filteredData = state.data.filter(item => {
-    const currentDate = new Date(item[state.dateName]);
-    return currentDate >= startDateObj && currentDate <= endDateObj;
-  });
-  setState((prevState) => ({
-    ...prevState,
-    showPredictResult: false,
-    showSummaryStat: false,
-    showGraph: true,
-    dataGraph:filteredData
-  }));}
 
   const filterData = ['actions', 'regions', 'regions - NaN', state.dateName];
   return (
@@ -441,7 +459,7 @@ const showGraph=()=>{
           alignItems="center"
           justifyContent="flex-start"
           width="100%"
-          marginBottom="16px"
+          flexWrap="wrap" 
         >
           <TextField
             type="file"
@@ -449,15 +467,15 @@ const showGraph=()=>{
             accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
             inputRef={fileInputRef}
             onChange={handleFileChange}
-            style={{ width: '250px' }}
+            style={{ width: '250px', marginTop: "16px" }}
           />
 
-          <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>Type</InputLabel>
+          <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+            <InputLabel>Type of Data</InputLabel>
             <Select
               value={state.type}
               onChange={(e) => setState({ ...state, type: e.target.value })}
-              style={{ minWidth: '100px' }}
+              style={{ minWidth: '200px' }}
             >
               {types.map((type) => (
                 <MenuItem key={type} value={type}>
@@ -466,191 +484,210 @@ const showGraph=()=>{
               ))}
             </Select>
           </FormControl>
-          {state.type? 
-            <>  
-
-          <FormControl style={{ marginLeft: '16px' }}>
-          <InputLabel>Method</InputLabel>
-          <Select
-            value={state.machineLearningMethod}
-            onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value, showPredictResult: false })}
-            style={{ minWidth: '100px' }}
-          >
-            {state.type === 'time-serious'? [...mlMethods.slice(2)].map((method) => (
-              <MenuItem key={method} value={method}>
-                {method}
-              </MenuItem>
-            )): mlMethods.filter(elem=>elem !== 'ARIMA').map((method) => (
-              <MenuItem key={method} value={method}>
-                {method}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-
-          <FormControl style={{ marginLeft: '16px' }}>
-          <InputLabel>{state.type === 'time-serious'? 'Select Date Variable':'dependent Variables'}</InputLabel>
-          <Select
-              value={state.dateName}
-              onChange={(e) => handleInputChange('dateName', e.target.value)}
-              style={{ minWidth: '150px' }}
-            >
-              {state.dependentVariable.map((variable) => (
-                <MenuItem key={variable} value={variable}>
-                  {variable}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {state.type === 'time-serious' && (
+          {state.type ?
             <>
-              <FormControl style={{ marginLeft: '16px' }}>
-                <InputLabel>Start Date</InputLabel>
+
+              <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+                <InputLabel>Method</InputLabel>
                 <Select
-                value={state.startDate}
-                onChange={(e) => handleInputChange('startDate', e.target.value)}
-                style={{ minWidth: '150px' }}
-              >
-              {state.data.map(item => (
-                <MenuItem key={item[state.dateName]} value={item[state.dateName]}>
-                  {item[state.dateName]}
-                </MenuItem>
-              ))}
-              </Select>
+                  value={state.machineLearningMethod}
+                  onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value, showPredictResult: false })}
+                  style={{ minWidth: '200px' }}
+                >
+                  {state.type === 'time-serious' ? [...mlMethods.slice(2)].map((method) => (
+                    <MenuItem key={method} value={method}>
+                      {method}
+                    </MenuItem>
+                  )) : mlMethods.filter(elem => elem !== 'ARIMA').map((method) => (
+                    <MenuItem key={method} value={method}>
+                      {method}
+                    </MenuItem>
+                  ))}
+                </Select>
               </FormControl>
-              <FormControl style={{ marginLeft: '16px' }}>
-                <InputLabel>End Date</InputLabel>
+
+              {state.type !== 'time-serious' ?
+                <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+                  <InputLabel>ID of the Data</InputLabel>
+                  <Select
+                    value={state.id}
+                    onChange={(e) => handleInputChange('id', e.target.value)}
+                    style={{ minWidth: '200px' }}
+                  >
+                  {state.dependentVariable.map((variable) => (
+                    <MenuItem key={variable} value={variable}>
+                      {variable}
+                    </MenuItem>
+                  ))}
+                  </Select>
+                </FormControl> : null}
+
+              <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+                <InputLabel>{state.type === 'time-serious' ? 'Select Date Variable' : 'dependent Variable'}</InputLabel>
                 <Select
-                value={state.endDate}
-                onChange={(e) => handleInputChange('endDate', e.target.value)}
-                style={{ minWidth: '150px' }}
-              >
-              {state.data.map(item => (
-                <MenuItem key={item[state.dateName]} value={item[state.dateName]}>
-                  {item[state.dateName]}
-                </MenuItem>
-              ))}
-              </Select>
+                  value={state.type === 'time-serious' ? state.dateName : state.y}
+                  onChange={(e) => handleInputChange(state.type === 'time-serious' ? 'dateName' : 'y', e.target.value)}
+                  style={{ minWidth: '200px' }}
+                >
+                  {state.dependentVariable.map((variable) => (
+                    <MenuItem key={variable} value={variable}>
+                      {variable}
+                    </MenuItem>
+                  ))}
+                </Select>
               </FormControl>
-            </>
-          )}
 
-          <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>{state.type === 'time-serious'? 'Endogenous Variables':'Independent Variables'}</InputLabel>
-            <div style={{ overflowX: 'auto' }}>
-              <Select
-                multiple
-                value={state.x}
-                onChange={(e) => handleInputChange('x', e.target.value)}
-                style={{ minWidth: '150px' }}
-                MenuProps={{
-                  anchorOrigin: {
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                  },
-                  transformOrigin: {
-                    vertical: 'top',
-                    horizontal: 'left',
-                  },
-                  getContentAnchorEl: null,
-                  PaperProps: {
-                    style: {
-                      maxHeight: '200px',
-                    },
-                  },
-                }}
-                renderValue={() => (
-                  <div>
-                    {state.x.map((variable) => (
-                      <Chip
-                        key={variable}
-                        label={variable}
-                        onDelete={() => removeVariable(variable, 'x')}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      />
+
+
+              {state.type === 'time-serious' && (
+                <>
+                  <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+                    <InputLabel>Start Date</InputLabel>
+                    <Select
+                      value={state.startDate}
+                      onChange={(e) => handleInputChange('startDate', e.target.value)}
+                      style={{ minWidth: '200px' }}
+                    >
+                      {state.data.map(item => (
+                        <MenuItem key={item[state.dateName || "Date"]} value={item[state.dateName || "Date"]}>
+                          {item[state.dateName || "Date"]}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+                    <InputLabel>End Date</InputLabel>
+                    <Select
+                      value={state.endDate}
+                      onChange={(e) => handleInputChange('endDate', e.target.value)}
+                      style={{ minWidth: '200px' }}
+                    >
+                    {state.data.map(item => (
+                      <MenuItem key={item[state.dateName || "Date"]} value={item[state.dateName || "Date"]}>
+                        {item[state.dateName || "Date"]}
+                      </MenuItem>
                     ))}
-                  </div>
-                )}
+                    </Select>
+                  </FormControl>
+                </>
+              )}
 
-              >
-                {state.independentVariables.map((variable) => (
-                  <MenuItem key={variable} value={variable}>
-                    {variable}
-                  </MenuItem>
-                ))}
-              </Select>
-            </div>
-          </FormControl>
+              <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+                <InputLabel>{state.type === 'time-serious' ? 'Endogenous Variables' : 'Independent Variables'}</InputLabel>
+                <div style={{ overflowX: 'auto' }}>
+                  <Select
+                    multiple
+                    value={state.x}
+                    onChange={(e) => handleInputChange('x', e.target.value)}
+                    style={{ minWidth: '200px' }}
+                    MenuProps={{
+                      anchorOrigin: {
+                        vertical: 'bottom',
+                        horizontal: 'left',
+                      },
+                      transformOrigin: {
+                        vertical: 'top',
+                        horizontal: 'left',
+                      },
+                      getContentAnchorEl: null,
+                      PaperProps: {
+                        style: {
+                          maxHeight: '200px',
+                        },
+                      },
+                    }}
+                    renderValue={() => (
+                      <div>
+                        {state.x.map((variable) => (
+                          <Chip
+                            key={variable}
+                            label={variable}
+                            onDelete={() => removeVariable(variable, 'x')}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          />
+                        ))}
+                      </div>
+                    )}
 
-          {state.type !== 'time-serious' && 
-          <> 
-          <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>Categorical Variables</InputLabel>
-            <div style={{ overflowX: 'auto' }}>
-              <Select
-                multiple
-                value={state.c}
-                onChange={(e) => handleInputChange('c', e.target.value)}
-                style={{ minWidth: '150px' }}
-                MenuProps={{
-                  anchorOrigin: {
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                  },
-                  transformOrigin: {
-                    vertical: 'top',
-                    horizontal: 'left',
-                  },
-                  getContentAnchorEl: null,
-                  PaperProps: {
-                    style: {
-                      maxHeight: '200px',
-                    },
-                  },
-                }}
-                renderValue={() => (
-                  <div>
-                    {state.c.map((variable) => (
-                      <Chip
-                        key={variable}
-                        label={variable}
-                        onDelete={() => removeVariable(variable, 'c')}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      />
+                  >
+                    {state.independentVariables.map((variable) => (
+                      <MenuItem key={variable} value={variable}>
+                        {variable}
+                      </MenuItem>
                     ))}
-                  </div>
-                )}
+                  </Select>
+                </div>
+              </FormControl>
 
-              >
-                {state.independentVariables.map((variable) => (
-                  <MenuItem key={variable} value={variable}>
-                    {variable}
-                  </MenuItem>
-                ))}
-              </Select>
-            </div>
-          </FormControl>
-          <FormControl style={{ marginLeft: '16px' }}>
-            <InputLabel>Outliers</InputLabel>
-            <Select
-              value={state.outliers}
-              onChange={(e) => setState({ ...state, outliers: e.target.value })}
-              style={{ minWidth: '150px' }}
-            >
-              <MenuItem value='Yes'>
-                Remove Outliers
-              </MenuItem>
-              <MenuItem value='No'>
-                Keep Outliers
-              </MenuItem>
-            </Select>
-          </FormControl>
-          </>
-           }
-           </>:null}  
+              {state.type !== 'time-serious' &&
+                <>
+                  <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+                    <InputLabel>Categorical Variables</InputLabel>
+                    <div style={{ overflowX: 'auto' }}>
+                      <Select
+                        multiple
+                        value={state.c}
+                        onChange={(e) => handleInputChange('c', e.target.value)}
+                        style={{ minWidth: '200px' }}
+                        MenuProps={{
+                          anchorOrigin: {
+                            vertical: 'bottom',
+                            horizontal: 'left',
+                          },
+                          transformOrigin: {
+                            vertical: 'top',
+                            horizontal: 'left',
+                          },
+                          getContentAnchorEl: null,
+                          PaperProps: {
+                            style: {
+                              maxHeight: '200px',
+                            },
+                          },
+                        }}
+                        renderValue={() => (
+                          <div>
+                            {state.c.map((variable) => (
+                              <Chip
+                                key={variable}
+                                label={variable}
+                                onDelete={() => removeVariable(variable, 'c')}
+                                onMouseDown={(e) => e.stopPropagation()}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                      >
+                        {state.independentVariables.map((variable) => (
+                          <MenuItem key={variable} value={variable}>
+                            {variable}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </div>
+                  </FormControl>
+                  <FormControl style={{ marginLeft: '16px', marginRight: '16px', marginTop: "16px"}}>
+                    <InputLabel>Outliers</InputLabel>
+                    <Select
+                      value={state.outliers}
+                      onChange={(e) => setState({ ...state, outliers: e.target.value })}
+                      style={{ minWidth: '200px' }}
+                    >
+                      <MenuItem value='Yes'>
+                        Remove Outliers
+                      </MenuItem>
+                      <MenuItem value='No'>
+                        Keep Outliers
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+                </>
+              }
+            </> : null}
         </Box>
-       
+
 
 
         <ButtonContainer>
@@ -664,20 +701,20 @@ const showGraph=()=>{
             Summary Statistics
           </Button>
           <ButtonSpacer />
-          {state.type === 'time-serious' && 
-          <>            
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={showGraph}
-            style={{ width: '150px' }}
-            disabled={state.type === '' || state.data.length === 0 || state.dateName === ''}
-          >
-            Line Graph
-          </Button>
-          <ButtonSpacer /> 
-          </>
-        }
+          {state.type === 'time-serious' &&
+            <>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={showGraph}
+                style={{ width: '150px' }}
+                disabled={state.type === '' || state.data.length === 0 || state.dateName === ''}
+              >
+                Line Graph
+              </Button>
+              <ButtonSpacer />
+            </>
+          }
           <Button
             variant="contained"
             color="primary"
@@ -700,25 +737,25 @@ const showGraph=()=>{
 
       </ContentWrapper>
       <Box>
-      {isLoading && <CircularProgress />}
-    </Box>
-      {state.showGraph && state.machineLearningMethod ==='ARIMA' && (
+        {isLoading && <CircularProgress />}
+      </Box>
+      {state.showGraph && !state.showPredictResult && !state.showSummaryStat && (
         <Box
-        style={{
-          alignItems: 'center',
-          marginTop: '16px',
-          width: '100%',
-          overflow: 'hidden',
-        }}
-      >
-        <TimeSeriesChart
-          data={state.dataGraph}
-          dateName={state.dateName}
-          targetVariables ={state.x}
-        />
+          style={{
+            alignItems: 'center',
+            marginTop: '16px',
+            width: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <TimeSeriesChart
+            data={state.dataGraph}
+            dateName={state.dateName}
+            targetVariables={state.x}
+          />
         </Box>
-    )}
-      {state.showPredictResult && mlMethods1.includes(state.machineLearningMethod) && (
+      )}
+      {state.showPredictResult && mlMethods1.includes(state.machineLearningMethod) && !state.showGraph && (
         <Box
           style={{
             display: 'flex',
