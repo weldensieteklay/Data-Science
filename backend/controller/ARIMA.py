@@ -1,6 +1,7 @@
 from flask import jsonify, request
 import pandas as pd
 from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.stattools import adfuller
 import numpy as np
 
 def is_valid_date(date_str):
@@ -9,6 +10,17 @@ def is_valid_date(date_str):
         return True
     except ValueError:
         return False
+
+def test_stationarity(data):
+    result = adfuller(data)
+    p_value = result[1]
+    
+    if p_value < 0.05:
+        stationary = True
+    else:
+        stationary = False
+        
+    return {'test_statistic': result[0], 'p_value': p_value, 'critical_values': result[4], 'stationary': stationary}
 
 def predict_price():
     try:
@@ -57,30 +69,102 @@ def predict_price():
         split_index = int(len(time_series) * 0.8)
         train_data, test_data = time_series.iloc[:split_index], time_series.iloc[split_index:]
 
-        arima_model = ARIMA(train_data[endogenous_variable], order=(5, 1, 0))
+        # Test for stationarity
+        stationary_results = test_stationarity(train_data[endogenous_variable])
+
+        # Fit ARIMA model
+        arima_order = (3, 0, 0) if stationary_results['stationary'] else (3, 1, 0)
+        trend = 'c' if stationary_results['stationary'] else None
+        arima_model = ARIMA(train_data[endogenous_variable], order=arima_order, trend=trend)
         arima_results = arima_model.fit()
 
-        forecast_values = arima_results.forecast(steps=len(test_data))
+        # Get model coefficients
+        coefficients = arima_results.params
 
+        # Extract lagged coefficients if available
+        lagged_coefficients = [coefficients.get(f'ar.L{i}', np.nan) for i in range(1, 4)]
+
+        # Extract standard errors and p-values if available
+        standard_errors = arima_results.bse
+        p_values = arima_results.pvalues
+
+        # Construct results dictionary
+        results_dict = []
+        if 'const' in coefficients.index:  # Check if constant term exists
+            constant_coefficient = coefficients['const']
+            results_dict.append({'field_name': 'constant', 'mean': f"{constant_coefficient:.3f}", 
+                                 'standard_error': f"{standard_errors['const']:.3f}" if 'const' in standard_errors.index else 'N/A', 
+                                 'p_value': f"{p_values['const']:.3f}" if 'const' in p_values.index else 'N/A'})
+        for i, (coefficient, std_error, p_value) in enumerate(zip(lagged_coefficients, standard_errors[1:], p_values[1:]), start=1):
+            results_dict.append({'field_name': f'{endogenous_variable}_{i}', 'mean': f"{coefficient:.3f}", 
+                                 'standard_error': f"{std_error:.3f}" if not np.isnan(std_error) else 'N/A', 
+                                 'p_value': f"{p_value:.3f}" if not np.isnan(p_value) else 'N/A'})
+
+        # Calculate MSE
+        forecast_values = arima_results.forecast(steps=len(test_data))
         mse = int(np.round(np.mean((test_data[endogenous_variable] - forecast_values) ** 2)))
 
+        # Get model statistics
         aic = arima_results.aic
         bic = arima_results.bic
 
-        mean = arima_results.params
-        standard_error = arima_results.bse
-        p_value = arima_results.pvalues
+        # Construct response object
+        response = {
+            'mse': mse,
+            'aic': aic,
+            'bic': bic,
+            'data': results_dict,
+            'stationary': stationary_results['stationary'],
+            'adfuller': np.round(stationary_results['p_value'], 3)
+        }
 
-        results_dict = [
-            {'field_name': 'constant', 'mean': f"{mean[0]:.3f}", 'standard_error': f"{standard_error[0]:.3f}",
-             'p_value': f"{p_value[0]:.3f}"}
-        ] + [
-            {'field_name': f'{column}', 'mean': f"{mean[i]:.3f}", 'standard_error': f"{standard_error[i]:.3f}",
-             'p_value': f"{p_value[i]:.3f}"}
-            for i, column in enumerate(train_data.columns[1:])
-        ]
+        # Add without_diff object if data is non-stationary
+        if not stationary_results['stationary']:
+            arima_order_without_diff = (3, 0, 0)
+            trend_without_diff = 'c'
+            arima_model_without_diff = ARIMA(train_data[endogenous_variable], order=arima_order_without_diff, trend=trend_without_diff)
+            arima_results_without_diff = arima_model_without_diff.fit()
 
-        return jsonify({'mse': mse, 'aic': aic, 'bic': bic, 'data': results_dict})
+            # Get model coefficients for undifferenced series
+            coefficients_without_diff = arima_results_without_diff.params
+
+            # Extract lagged coefficients if available for undifferenced series
+            lagged_coefficients_without_diff = [coefficients_without_diff.get(f'ar.L{i}', np.nan) for i in range(1, 4)]
+
+            # Extract standard errors and p-values if available for undifferenced series
+            standard_errors_without_diff = arima_results_without_diff.bse
+            p_values_without_diff = arima_results_without_diff.pvalues
+
+            # Calculate MSE for undifferenced series
+            forecast_values_without_diff = arima_results_without_diff.forecast(steps=len(test_data))
+            mse_without_diff = int(np.round(np.mean((test_data[endogenous_variable] - forecast_values_without_diff) ** 2)))
+
+            # Get model statistics for undifferenced series
+            aic_without_diff = arima_results_without_diff.aic
+            bic_without_diff = arima_results_without_diff.bic
+
+            # Construct results dictionary for undifferenced series
+            results_dict_without_diff = []
+            if 'const' in coefficients_without_diff.index:  # Check if constant term exists
+                constant_coefficient_without_diff = coefficients_without_diff['const']
+                results_dict_without_diff.append({'field_name': 'constant', 'mean': f"{constant_coefficient_without_diff:.3f}", 
+                                         'standard_error': f"{standard_errors_without_diff['const']:.3f}" if 'const' in standard_errors_without_diff.index else 'N/A', 
+                                         'p_value': f"{p_values_without_diff['const']:.3f}" if 'const' in p_values_without_diff.index else 'N/A'})
+            for i, (coefficient, std_error, p_value) in enumerate(zip(lagged_coefficients_without_diff, standard_errors_without_diff[1:], p_values_without_diff[1:]), start=1):
+                results_dict_without_diff.append({'field_name': f'{endogenous_variable}_{i}', 'mean': f"{coefficient:.3f}", 
+                                         'standard_error': f"{std_error:.3f}" if not np.isnan(std_error) else 'N/A', 
+                                         'p_value': f"{p_value:.3f}" if not np.isnan(p_value) else 'N/A'})
+
+            # Add results for undifferenced series to response
+            response['without_diff'] = {
+                'mse': mse_without_diff,
+                'aic': aic_without_diff,
+                'bic': bic_without_diff,
+                'data': results_dict_without_diff
+            }
+
+        return jsonify(response)
 
     except Exception as e:
         return jsonify({'error': repr(e)}), 500
+

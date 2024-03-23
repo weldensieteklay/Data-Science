@@ -94,7 +94,7 @@ def run_non_time_series_bagging_model(data):
 
         return jsonify({
             "mse": mse,
-            "feature_importance": [{"feature": feature, "importance": importance} for feature, importance in sorted_feature_importance],
+            "feature_importance": [{"feature": feature, "importance": round(importance, 3)} for feature, importance in sorted_feature_importance],
             "outliers_count": 0 if not remove_outliers_flag else len(df) - len(X_train),
         })
 
@@ -166,7 +166,7 @@ def run_time_series_bagging_model(data):
         feature_importance = np.mean([estimator.feature_importances_ for estimator in bagging_model.estimators_], axis=0)
         sorted_feature_importance = sorted(zip(X_train.columns, feature_importance), key=lambda item: item[1], reverse=True)
 
-        sorted_feature_importance = [{"feature": feature, "importance": float(importance)} for feature, importance in sorted_feature_importance]
+        sorted_feature_importance = [{"feature": feature, "importance": round(float(importance), 3)} for feature, importance in sorted_feature_importance]
 
         return jsonify({
             "mse": mse,

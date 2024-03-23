@@ -126,13 +126,12 @@ def non_time_series_neural_network__model(data):
         print(f"An error occurred: {repr(e)}")
         return jsonify({'error': repr(e)}), 500
 
-
 def run_time_series_lstm_model(data):
     try:
         actual_datas = data.get('data')
-        
+
         actual_data = [entry for entry in actual_datas if all(value not in ['', '0'] for value in entry.values())]
-        
+
         if not actual_data:
             return jsonify({'error': 'No valid data provided'}), 400
 
@@ -143,7 +142,7 @@ def run_time_series_lstm_model(data):
         endogenous_variable = None
 
         for key in keys:
-            value = first_object[key] 
+            value = first_object[key]
             if is_valid_date(value):
                 date_column = key
             else:
@@ -204,19 +203,50 @@ def run_time_series_lstm_model(data):
 
         mse = round(model.evaluate(X_test, y_test, verbose=0), 3)
 
-
         feature_names = time_series.drop(endogenous_variable, axis=1).columns.tolist()  # Exclude endogenous variable
         feature_importance = extract_feature_importance(model, feature_names)  # Pass feature names to extract_feature_importance
 
         sorted_feature_importance = convert_to_json_serializable(feature_importance)
-        new_feature_importance = [{"feature": feature, "importance": importance} for feature, importance in sorted_feature_importance]
+        new_feature_importance = [{"feature": feature, "importance": np.round(importance, 3)} for feature, importance in sorted_feature_importance]
 
+        # Make predictions
+        y_pred = model.predict(X_test).flatten()
+        
+        # Reshape y_test and y_pred separately for inverse transformation
+        y_test_reshaped = y_test.reshape(-1, 1)
+        y_pred_reshaped = y_pred.reshape(-1, 1)
+        y_test_reshaped = y_test_reshaped.flatten()
+        y_pred_reshaped = y_pred_reshaped.flatten()
+
+        # Inverse transform manually
+        y_test_reshaped = np.reshape(y_test_reshaped, (-1, 1))
+        y_pred_reshaped = np.reshape(y_pred_reshaped, (-1, 1))
+
+    #    # Inverse transform using scaler
+    #     actual_values = scaler.inverse_transform(y_test_reshaped)
+    #     predicted_values = scaler.inverse_transform(y_pred_reshaped)
+
+
+
+        # Calculate MSE for each observation
+        mse_per_observation = (y_test_reshaped - y_pred_reshaped) ** 2
+
+        # Get corresponding dates for test data
+        test_dates = test_data.index[TIME_STEPS:]  # Skip initial TIME_STEPS due to lagged variables
+
+        # # Combine actual, predicted values, MSE, and dates
+        # actual_vs_pred = pd.DataFrame({'Date': test_dates, 'Actual': actual_values, 'Prediction': predicted_values, 'MSE': mse_per_observation})
+
+        # Sort DataFrame based on MSE values in increasing order
+        # actual_vs_pred_sorted = actual_vs_pred.sort_values(by='MSE')
+       
         return jsonify({
             "mse": mse,
             "feature_importance": new_feature_importance,
             "history": history.history
+
         })
 
     except Exception as e:
         return jsonify({'error': repr(e)}), 500
-   
+

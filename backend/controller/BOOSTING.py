@@ -154,7 +154,7 @@ def run_time_series_xgboost_model(data):
         feature_importance = results.feature_importances_
         sorted_feature_importance = sorted(zip(X_train.columns, feature_importance), key=lambda item: item[1], reverse=True)
 
-        sorted_feature_importance = [{"feature": feature, "importance": float(importance)} for feature, importance in sorted_feature_importance]
+        sorted_feature_importance = [{"feature": feature, "importance": round(float(importance), 3)} for feature, importance in sorted_feature_importance]
 
         return jsonify({
             "mse": mse,

@@ -72,7 +72,11 @@ const initialState = {
   startDate: '',
   endDate: '',
   dateName: '',
-  type: ''
+  type: '',
+  stationary: [],
+  adf: null,
+  predictionResult_withoutDiff:[],
+  mse_withoutDiff: ''
 };
 
 
@@ -154,29 +158,48 @@ const FileUpload = () => {
     const db = await openDB();
     const transaction = db.transaction("csvFiles", "readwrite");
     const csvFileStore = transaction.objectStore("csvFiles");
-    const existingFile = await csvFileStore.get(1);
-
-    if (existingFile) {
-      existingFile.data = data;
-      csvFileStore.put(existingFile);
-    } else {
-      csvFileStore.add({ data });
-    }
+    csvFileStore.clear();
+    csvFileStore.add({ data });
   };
 
 
+  const determineStationaryValue = (state, response) => {
+    if (state.type === 'time-serious'
+      && response.data.hasOwnProperty('stationary')
+      && !response.data.stationary) {
+      if (!state.stationary.includes(state.x[0])) {
+        return state.stationary.concat(state.x[0]);
+      }
+    }
+    return state.stationary;
+  };
+  
   const handlePredict = () => {
     setIsLoading(true);
     const isValidCategoricals = state.c.every(catVar => state.x.includes(catVar)) || state.c === state.y;
     if (!isValidCategoricals) {
       alert('Not selected categorical variables are among the dependent or independent variables');
+      setIsLoading(false);
       return;
     }
     if (state.type !== 'time-serious' && !state.id) {
       alert('Select an ID. It is required field for non-time serious prediction');
+      setIsLoading(false);
       return;
     }
-    const selectedData = state.data.map((row) => {
+    const startDateObj = new Date(state.startDate);
+    const endDateObj = new Date(state.endDate);
+
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      alert("Please provide valid start and end dates.");
+      return;
+    }
+
+    const filteredData = state.data.filter(item => {
+      const currentDate = new Date(item[state.dateName]);
+      return currentDate >= startDateObj && currentDate <= endDateObj;
+    });
+    const selectedData = filteredData.map((row) => {
       let rowData = {};
       if (state.type === 'time-serious') {
         rowData[state.dateName] = row[state.dateName]
@@ -203,27 +226,30 @@ const FileUpload = () => {
       showGraph: false
     }));
 
-    if (state.machineLearningMethod === 'ARIMA') {
+    if (state.type === 'time-serious') {
       const firstRowDate = new Date(data.data[0][state.dateName]);
       if (isNaN(firstRowDate.getTime())) {
         alert('The Date variable must be in a valid date format for ARIMA model');
+        setIsLoading(false);
         return;
       }
-
       if (state.x.length !== 1) {
-        alert('For ARIMA model, endogonous variable must be with exactly one variable');
+        alert('For time serious model, endogonous variable must be with exactly one variable');
+        setIsLoading(false);
         return;
       }
     }
     axios.post(`http://127.0.0.1:5000/${state.machineLearningMethod}`, data)
       .then(response => {
         setIsLoading(false);
+        const stationaryValue = determineStationaryValue(state, response);
         if (mlMethods2.includes(state.machineLearningMethod)) {
           setState((prevState) => ({
             ...prevState,
             treeResponse: response.data,
             showPredictResult: true,
-            showSummaryStat: false
+            showSummaryStat: false,
+            showGraph: false
           }));
         } else {
           setState((prevState) => ({
@@ -235,7 +261,11 @@ const FileUpload = () => {
             heteroscedasticity: response.data.heteroscedasticity,
             outliers_count: response.data.outliers_count,
             R2: response.data.R2,
-            showSummaryStat: false
+            showSummaryStat: false,
+            stationary: stationaryValue,
+            adf: response.data.adfuller,
+            predictionResult_withoutDiff: response.data.without_diff?.data || [],
+            mse_withoutDiff: response.data.without_diff?.mse || []
           }));
         }
       })
@@ -244,7 +274,6 @@ const FileUpload = () => {
         console.log(err, 'Error in predict');
       });
   };
-
   const handleInputChange = (name, value) => {
     setState((prevData) => ({
       ...prevData,
@@ -263,7 +292,8 @@ const FileUpload = () => {
       showPredictResult: false,
       showGraph: false,
       type: '',
-      dateName: ''
+      dateName: '',
+      stationary: [],
     }));
   };
 
@@ -317,11 +347,14 @@ const FileUpload = () => {
       };
 
       state.x.forEach((variable) => {
-        rowData[variable] = isNaN(parseFloat(row[variable])) ? row[variable] : parseFloat(row[variable]);
+        // Ignore if value is empty, undefined, or null
+        if (row[variable] !== '' && row[variable] !== undefined && row[variable] !== null) {
+          rowData[variable] = isNaN(parseFloat(row[variable])) ? row[variable] : parseFloat(row[variable]);
+        }
       });
 
       return rowData;
-    });
+    }).filter(row => Object.values(row).every(value => value !== '' && value !== undefined && value !== null));
 
     const summaryStatistics = [];
     if (state.y && !state.c.includes(state.y)) {
@@ -382,6 +415,91 @@ const FileUpload = () => {
       showGraph: false
     }));
   };
+
+  // const handleSummary = () => {
+  //   const isValidCategoricals =
+  //     state.c.every((catVar) => state.x.includes(catVar)) || state.c === state.y;
+  //   if (!isValidCategoricals) {
+  //     alert(
+  //       'Not selected categorical variables are among the dependent or independent variables'
+  //     );
+  //     return;
+  //   }
+
+  //   const selectedData = state.data.map((row) => {
+  //     const rowData = {
+  //       [state.id]: row[state.id],
+  //       [state.y]: parseFloat(row[state.y]),
+  //     };
+
+  //     state.x.forEach((variable) => {
+  //       rowData[variable] = isNaN(parseFloat(row[variable])) ? row[variable] : parseFloat(row[variable]);
+  //     });
+
+  //     return rowData;
+  //   });
+
+  //   const summaryStatistics = [];
+  //   if (state.y && !state.c.includes(state.y)) {
+  //     const yValues = selectedData.map((row) => row[state.y]);
+  //     summaryStatistics.push({
+  //       field_name: state.y,
+  //       mean_or_percentages: calculateMean(yValues),
+  //       standard_deviation: calculateStd(yValues),
+  //     });
+  //   }
+
+  //   state.x
+  //     .filter((variable) => !state.c.includes(variable))
+  //     .forEach((variable) => {
+  //       const variableValues = selectedData.map((row) => row[variable]);
+  //       summaryStatistics.push({
+  //         field_name: variable,
+  //         mean_or_percentages: calculateMean(variableValues),
+  //         standard_deviation: calculateStd(variableValues),
+  //       });
+  //     });
+
+  //   state.c.forEach((variable) => {
+  //     const variableValues = selectedData.map((row) => row[variable]);
+  //     if (typeof variableValues[0] === 'string') {
+  //       const counts = calculateCountsCategorical(variableValues);
+  //       const total = variableValues.length;
+  //       const percentages = {};
+  //       Object.entries(counts).forEach(([category, count]) => {
+  //         percentages[category] = ((count / total) * 100).toFixed(3);
+  //       });
+  //       const categories = Object.keys(percentages);
+  //       categories.forEach((category) => {
+  //         summaryStatistics.push({
+  //           field_name: `${variable} - ${category}`,
+  //           mean_or_percentages: percentages[category] + '%',
+  //         });
+  //       });
+  //     } else {
+  //       const percentages = calculatePercentages(variableValues);
+  //       const categories = Object.keys(percentages);
+  //       categories.forEach((category) => {
+  //         summaryStatistics.push({
+  //           field_name: `${variable} - ${category}`,
+  //           mean_or_percentages: percentages[category] + '%',
+  //         });
+  //       });
+  //     }
+  //   });
+
+  //   console.log('Summary Statistics:', summaryStatistics);
+
+  //   setState((prevState) => ({
+  //     ...prevState,
+  //     summaryStatistics: summaryStatistics,
+  //     showSummaryStat: true,
+  //     showPredictResult: false,
+  //     showGraph: false
+  //   }));
+  // };
+
+
   const calculateCounts = (values) => {
     const counts = {};
     values.forEach((value) => {
@@ -440,6 +558,8 @@ const FileUpload = () => {
   }
 
   const filterData = ['actions', 'regions', 'regions - NaN', state.dateName];
+  const dependentField = state.type === 'time-serious'? state.x[0] || '': state.y || ''
+  console.log(dependentField, 'gggggggggggggggggggg', state)
   return (
     <Box
       display="flex"
@@ -459,7 +579,7 @@ const FileUpload = () => {
           alignItems="center"
           justifyContent="flex-start"
           width="100%"
-          flexWrap="wrap" 
+          flexWrap="wrap"
         >
           <TextField
             type="file"
@@ -514,11 +634,11 @@ const FileUpload = () => {
                     onChange={(e) => handleInputChange('id', e.target.value)}
                     style={{ minWidth: '200px' }}
                   >
-                  {state.dependentVariable.map((variable) => (
-                    <MenuItem key={variable} value={variable}>
-                      {variable}
-                    </MenuItem>
-                  ))}
+                    {state.dependentVariable.map((variable) => (
+                      <MenuItem key={variable} value={variable}>
+                        {variable}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl> : null}
 
@@ -563,11 +683,11 @@ const FileUpload = () => {
                       onChange={(e) => handleInputChange('endDate', e.target.value)}
                       style={{ minWidth: '200px' }}
                     >
-                    {state.data.map(item => (
-                      <MenuItem key={item[state.dateName || "Date"]} value={item[state.dateName || "Date"]}>
-                        {item[state.dateName || "Date"]}
-                      </MenuItem>
-                    ))}
+                      {state.data.map(item => (
+                        <MenuItem key={item[state.dateName || "Date"]} value={item[state.dateName || "Date"]}>
+                          {item[state.dateName || "Date"]}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                 </>
@@ -668,7 +788,7 @@ const FileUpload = () => {
                       </Select>
                     </div>
                   </FormControl>
-                  <FormControl style={{ marginLeft: '16px', marginRight: '16px', marginTop: "16px"}}>
+                  <FormControl style={{ marginLeft: '16px', marginRight: '16px', marginTop: "16px" }}>
                     <InputLabel>Outliers</InputLabel>
                     <Select
                       value={state.outliers}
@@ -752,6 +872,7 @@ const FileUpload = () => {
             data={state.dataGraph}
             dateName={state.dateName}
             targetVariables={state.x}
+            stationary={state.stationary}
           />
         </Box>
       )}
@@ -770,13 +891,40 @@ const FileUpload = () => {
             data={state.predictionResult}
             mse={state.mse}
             filterData={filterData}
-            title={state.machineLearningMethod + ' Results'}
+            title={state.predictionResult_withoutDiff.length>0 ? dependentField + ' ' + state.machineLearningMethod + ' Results By Making a Difference': dependentField + ' ' +  state.machineLearningMethod + ' Results'}
             itemsPerPage={25}
-            headers={['field_name', 'mean', 'standard_error', 'p_value']}
+            headers={!['LASSO', 'RIDGE'].includes(state.machineLearningMethod) ? ['field_name', 'mean', 'standard_error', 'p_value'] : ['field_name', 'mean']}
             heteroscedasticity={state.heteroscedasticity}
             multicollinearity={state.multicollinearity}
             outliers_count={state.outliers_count}
             R2={state.R2}
+          />
+        </Box>
+      )}
+      {state.showPredictResult && state.predictionResult_withoutDiff.length>0
+        && mlMethods1.includes(state.machineLearningMethod) && !state.showGraph && (
+        <Box
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginTop: '16px',
+            width: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <CustomTable
+            data={state.predictionResult_withoutDiff}
+            mse={state.mse_withoutDiff}
+            filterData={filterData}
+            title={dependentField + ' ' + state.machineLearningMethod + ' Results Without Making a Difference'}
+            itemsPerPage={25}
+            headers={!['LASSO', 'RIDGE'].includes(state.machineLearningMethod) ? ['field_name', 'mean', 'standard_error', 'p_value'] : ['field_name', 'mean']}
+            heteroscedasticity={state.heteroscedasticity}
+            multicollinearity={state.multicollinearity}
+            outliers_count={state.outliers_count}
+            R2={state.R2}
+            adf={state.adf}
           />
         </Box>
       )}
@@ -814,7 +962,7 @@ const FileUpload = () => {
           >
             <TreeCustomTable
               response={state.treeResponse}
-              title={state.machineLearningMethod}
+              title={dependentField + ' ' + state.machineLearningMethod + " Results"}
               type={state.type}
             />
           </Box>

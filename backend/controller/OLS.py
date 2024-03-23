@@ -56,8 +56,8 @@ def run_ols_model():
 
         df = df.dropna()
 
-        if len(df) < 2:  
-            return jsonify({'error': 'Insufficient data after handling missing values'}), 400
+        # if len(df) < 2:  
+        #     return jsonify({'error': 'Insufficient data after handling missing values'}), 400
 
         remove_outliers_flag = data.get('outliers', '').lower() == 'yes'
         if remove_outliers_flag:
