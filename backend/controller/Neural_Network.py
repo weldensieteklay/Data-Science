@@ -35,8 +35,8 @@ def run_neural_network_model():
 
         type = data.get('type')
 
-        if type == 'time-serious':
-            return run_time_series_lstm_model(data)
+        if type == 'time-series':
+            return run_time_series_ANN_model(data)
         else:
             return non_time_series_neural_network__model(data)
 
@@ -126,12 +126,57 @@ def non_time_series_neural_network__model(data):
         print(f"An error occurred: {repr(e)}")
         return jsonify({'error': repr(e)}), 500
 
-def run_time_series_lstm_model(data):
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+
+def preprocess_data(data):
+    # Your preprocessing steps here
+    X_train, X_test, y_train, y_test = train_test_split(data['X'], data['y'], test_size=0.2, random_state=42)
+    feature_names = data['feature_names']
+    return X_train, X_test, y_train, y_test, feature_names
+
+def extract_feature_importance(model, feature_names):
+    # Retrieve the weights of the connections between input and LSTM units
+    weights_input_to_lstm = model.layers[0].get_weights()[0]  # Assuming the first layer is LSTM
+    
+    # Ensure that the weights are converted to float64 to avoid data type mismatch
+    weights_input_to_lstm = weights_input_to_lstm.astype('float64')
+    
+    # Calculate the mean absolute value of these weights along the input dimension to represent the importance of each feature
+    feature_importance = np.mean(np.abs(weights_input_to_lstm), axis=0)
+    
+    return dict(zip(feature_names, feature_importance))
+
+
+
+def convert_to_json_serializable(feature_importance):
+    # Your conversion code here
+    sorted_feature_importance = sorted(feature_importance.items(), key=lambda item: item[1], reverse=True)
+    return [{"feature": feature, "importance": importance} for feature, importance in sorted_feature_importance]
+
+def get_variable_type(df, variable_name):
+    unique_values = df[variable_name].unique()
+    if len(unique_values) <= 10: 
+        return 'categorical'
+    else:
+        return 'continuous'
+
+
+def run_time_series_ANN_model(data):
     try:
         actual_datas = data.get('data')
+        exogenous_variables = data.get('exogenous', [])        
 
-        actual_data = [entry for entry in actual_datas if all(value not in ['', '0'] for value in entry.values())]
-
+        actual_data = [entry for entry in actual_datas if all(value not in [''] for value in entry.values())]
+        
         if not actual_data:
             return jsonify({'error': 'No valid data provided'}), 400
 
@@ -140,13 +185,21 @@ def run_time_series_lstm_model(data):
 
         date_column = None
         endogenous_variable = None
+        categorical_exogenous_variables = []
+        continuous_exogenous_variables = []
 
         for key in keys:
-            value = first_object[key]
+            value = first_object[key] 
             if is_valid_date(value):
                 date_column = key
-            else:
+            elif key not in exogenous_variables:
                 endogenous_variable = key
+            elif key in exogenous_variables:
+                variable_type = get_variable_type(pd.DataFrame(actual_data), key)
+                if variable_type == 'categorical':
+                    categorical_exogenous_variables.append(key)
+                else:
+                    continuous_exogenous_variables.append(key)
 
         if date_column is None:
             return jsonify({'error': 'Could not find suitable column name for the date variable'}), 400
@@ -165,6 +218,12 @@ def run_time_series_lstm_model(data):
         for lag, lagged_variable_name in enumerate(lagged_variable_names, start=1):
             df[lagged_variable_name] = df[endogenous_variable].shift(lag)
 
+        for exogenous_var in categorical_exogenous_variables:
+            df[exogenous_var] = df[exogenous_var].astype('category')
+
+        for exogenous_var in continuous_exogenous_variables:
+            df[exogenous_var] = pd.to_numeric(df[exogenous_var], errors='coerce')
+
         df.dropna(inplace=True)
 
         time_series = df.set_index(date_column)
@@ -172,81 +231,57 @@ def run_time_series_lstm_model(data):
         split_index = int(len(time_series) * 0.8)
         train_data, test_data = time_series.iloc[:split_index], time_series.iloc[split_index:]
 
-        scaler = MinMaxScaler()
-        train_data_scaled = scaler.fit_transform(train_data)
-        test_data_scaled = scaler.transform(test_data)
+        X_train = train_data.drop(columns=[endogenous_variable])
+        y_train = train_data[endogenous_variable]
 
-        def create_dataset(X, y, time_steps=1):
-            Xs, ys = [], []
-            for i in range(len(X) - time_steps):
-                v = X[i:(i + time_steps)]
-                Xs.append(v)
-                ys.append(y[i + time_steps])
-            return np.array(Xs), np.array(ys)
+        X_test = test_data.drop(columns=[endogenous_variable])
+        y_test = test_data[endogenous_variable]
 
-        TIME_STEPS = 3
-        X_train, y_train = create_dataset(train_data_scaled, train_data_scaled[:, 0], TIME_STEPS)
-        X_test, y_test = create_dataset(test_data_scaled, test_data_scaled[:, 0], TIME_STEPS)
+        for exog_var in categorical_exogenous_variables[:-1]: 
+            X_train[exog_var] = train_data[exog_var]
+            X_test[exog_var] = test_data[exog_var]
+        
+        for exog_var in continuous_exogenous_variables[:-1]:
+            train_data = train_data.drop(columns=[exog_var])
+            test_data = test_data.drop(columns=[exog_var])
+
+        X_train_array = X_train.values
+        X_test_array = X_test.values
+
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train_array)
+        X_test_scaled = scaler.transform(X_test_array)
+
         model = Sequential()
-        model.add(LSTM(units=64, input_shape=(X_train.shape[1], X_train.shape[2])))
-        model.add(Dense(units=1))
+        model.add(Dense(64, activation='relu', input_shape=(X_train_scaled.shape[1],)))
+        model.add(Dense(32, activation='relu'))
+        model.add(Dense(1))  
+
         model.compile(optimizer='adam', loss='mean_squared_error')
 
-        history = model.fit(
-            X_train, y_train,
-            epochs=100,
-            batch_size=16,
-            validation_split=0.1,
-            verbose=0,
-            shuffle=False
-        )
+        # Train the model
+        model.fit(X_train_scaled, y_train, epochs=100, batch_size=32, verbose=0)
 
-        mse = round(model.evaluate(X_test, y_test, verbose=0), 3)
-
-        feature_names = time_series.drop(endogenous_variable, axis=1).columns.tolist()  # Exclude endogenous variable
-        feature_importance = extract_feature_importance(model, feature_names)  # Pass feature names to extract_feature_importance
-
-        sorted_feature_importance = convert_to_json_serializable(feature_importance)
-        new_feature_importance = [{"feature": feature, "importance": np.round(importance, 3)} for feature, importance in sorted_feature_importance]
-
-        # Make predictions
-        y_pred = model.predict(X_test).flatten()
-        
-        # Reshape y_test and y_pred separately for inverse transformation
-        y_test_reshaped = y_test.reshape(-1, 1)
-        y_pred_reshaped = y_pred.reshape(-1, 1)
-        y_test_reshaped = y_test_reshaped.flatten()
-        y_pred_reshaped = y_pred_reshaped.flatten()
-
-        # Inverse transform manually
-        y_test_reshaped = np.reshape(y_test_reshaped, (-1, 1))
-        y_pred_reshaped = np.reshape(y_pred_reshaped, (-1, 1))
-
-    #    # Inverse transform using scaler
-    #     actual_values = scaler.inverse_transform(y_test_reshaped)
-    #     predicted_values = scaler.inverse_transform(y_pred_reshaped)
+        # Evaluate the model
+        mse = np.round(mean_squared_error(y_test, model.predict(X_test_scaled)), decimals=2)
+        # mse = np.round(np.mean((model.predict(X_test) - y_test)**2), decimals=2)
 
 
+        # Extracting feature importance based on weights
+        weights_input_hidden = model.layers[0].get_weights()[0]
+        feature_importance = np.abs(weights_input_hidden).mean(axis=0)
 
-        # Calculate MSE for each observation
-        mse_per_observation = (y_test_reshaped - y_pred_reshaped) ** 2
+        sorted_feature_importance = sorted(zip(X_train.columns, feature_importance), key=lambda item: item[1], reverse=True)
 
-        # Get corresponding dates for test data
-        test_dates = test_data.index[TIME_STEPS:]  # Skip initial TIME_STEPS due to lagged variables
+        sorted_feature_importance = [{"feature": feature, "importance": "{:.3f}".format(float(importance))} for feature, importance in sorted_feature_importance]
 
-        # # Combine actual, predicted values, MSE, and dates
-        # actual_vs_pred = pd.DataFrame({'Date': test_dates, 'Actual': actual_values, 'Prediction': predicted_values, 'MSE': mse_per_observation})
-
-        # Sort DataFrame based on MSE values in increasing order
-        # actual_vs_pred_sorted = actual_vs_pred.sort_values(by='MSE')
-       
         return jsonify({
             "mse": mse,
-            "feature_importance": new_feature_importance,
-            "history": history.history
-
+            "feature_importance": sorted_feature_importance,
         })
-
+   
+        
     except Exception as e:
         return jsonify({'error': repr(e)}), 500
 
+   

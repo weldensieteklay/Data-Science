@@ -18,6 +18,10 @@ def remove_outliers(df, columns, z_threshold=3):
     after_outliers = len(df)
     return df, before_outliers - after_outliers
 
+def get_variable_type(data, variable):
+    unique_values = data[variable].unique()
+    return 'categorical' if len(unique_values) <= 10 else 'continuous'
+
 def run_xgboost_model():
     try:
         data = request.get_json()
@@ -26,7 +30,7 @@ def run_xgboost_model():
 
         type = data.get('type')
 
-        if type == 'time-serious':
+        if type == 'time-series':
             return run_time_series_xgboost_model(data)
         else:
             return run_non_time_series_xgboost_model(data)
@@ -94,12 +98,15 @@ def run_non_time_series_xgboost_model(data):
         print(f"An error occurred: {repr(e)}")  
         return jsonify({'error': repr(e)}), 500
 
+import lightgbm as lgb
 
 def run_time_series_xgboost_model(data):
     try:
         actual_datas = data.get('data')
+        exogenous_variables = data.get('exogenous', [])        
+
         
-        actual_data = [entry for entry in actual_datas if all(value not in ['', '0'] for value in entry.values())]
+        actual_data = [entry for entry in actual_datas if all(value not in [''] for value in entry.values())]
         
         if not actual_data:
             return jsonify({'error': 'No valid data provided'}), 400
@@ -109,13 +116,21 @@ def run_time_series_xgboost_model(data):
 
         date_column = None
         endogenous_variable = None
+        categorical_exogenous_variables = []
+        continuous_exogenous_variables = []
 
         for key in keys:
             value = first_object[key] 
             if is_valid_date(value):
                 date_column = key
-            else:
+            elif key not in exogenous_variables:
                 endogenous_variable = key
+            elif key in exogenous_variables:
+                variable_type = get_variable_type(pd.DataFrame(actual_data), key)
+                if variable_type == 'categorical':
+                    categorical_exogenous_variables.append(key)
+                else:
+                    continuous_exogenous_variables.append(key)
 
         if date_column is None:
             return jsonify({'error': 'Could not find suitable column name for the date variable'}), 400
@@ -133,6 +148,12 @@ def run_time_series_xgboost_model(data):
         lagged_variable_names = [f"{endogenous_variable}_{i}" for i in range(1, 4)]
         for lag, lagged_variable_name in enumerate(lagged_variable_names, start=1):
             df[lagged_variable_name] = df[endogenous_variable].shift(lag)
+        
+        for exogenous_var in categorical_exogenous_variables:
+            df[exogenous_var] = df[exogenous_var].astype('category')
+
+        for exogenous_var in continuous_exogenous_variables:
+            df[exogenous_var] = pd.to_numeric(df[exogenous_var], errors='coerce')
 
         df.dropna(inplace=True)
 
@@ -141,24 +162,49 @@ def run_time_series_xgboost_model(data):
         split_index = int(len(time_series) * 0.8)
         train_data, test_data = time_series.iloc[:split_index], time_series.iloc[split_index:]
 
+
         X_train = train_data.drop(columns=[endogenous_variable])
         y_train = train_data[endogenous_variable]
 
         X_test = test_data.drop(columns=[endogenous_variable])
         y_test = test_data[endogenous_variable]
 
-        model = XGBRegressor(n_estimators=100, random_state=42)
-        results = model.fit(X_train, y_train)
-        mse = int(np.round(np.mean((results.predict(X_test) - y_test) ** 2)))
+        for exog_var in categorical_exogenous_variables[:-1]: 
+            X_train[exog_var] = train_data[exog_var]
+            X_test[exog_var] = test_data[exog_var]
+        
+        for exog_var in continuous_exogenous_variables[:-1]:
+           train_data = train_data.drop(columns=[exog_var])
+           test_data = test_data.drop(columns=[exog_var])
 
-        feature_importance = results.feature_importances_
-        sorted_feature_importance = sorted(zip(X_train.columns, feature_importance), key=lambda item: item[1], reverse=True)
 
-        sorted_feature_importance = [{"feature": feature, "importance": round(float(importance), 3)} for feature, importance in sorted_feature_importance]
+        X_test_array = X_test.values
 
+
+# Create LightGBM dataset
+        train_data = lgb.Dataset(X_train, label=y_train)
+        test_data = lgb.Dataset(X_test_array, label=y_test)
+
+# Specify parameters and train model
+        params = {
+           'objective': 'regression',
+            'metric': 'mse',
+            'random_seed': 42
+         }
+        model = lgb.train(params, train_data, num_boost_round=100)
+        # model = XGBRegressor(n_estimators=100, random_state=42)
+        # results = model.fit(X_train, y_train)
+        mse = np.round(np.mean((model.predict(X_test) - y_test)**2), decimals=2)
+
+
+         # Get feature importances
+        feature_importance = model.feature_importance(importance_type='gain')
+        normalized_feature_importance = feature_importance / np.sum(feature_importance)  # Normalize importance scores
+        sorted_normalized_feature_importance = sorted(zip(X_train.columns, normalized_feature_importance), key=lambda item: item[1], reverse=True)
+        sorted_normalized_feature_importance = [{"feature": feature, "importance": "{:.3f}".format(float(importance))} for feature, importance in sorted_normalized_feature_importance]
         return jsonify({
             "mse": mse,
-            "feature_importance": sorted_feature_importance,
+            "feature_importance": sorted_normalized_feature_importance,
         })
    
         

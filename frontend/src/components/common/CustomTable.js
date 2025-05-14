@@ -19,7 +19,7 @@ const capitalizeFirstLetter = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const CustomTable = ({ data = [], filterData, title, itemsPerPage, headers, mse, R2, multicollinearity, heteroscedasticity, outliers_count, adf }) => {
+const CustomTable = ({ data = [], filterData, title, itemsPerPage, headers, mse, R2, multicollinearity, heteroscedasticity, outliers_count, adf, sampleSize }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -64,6 +64,7 @@ const CustomTable = ({ data = [], filterData, title, itemsPerPage, headers, mse,
         multicollinearity ? `Multicollinearity: ${multicollinearity}` : '',
         multicollinearity ? `Heteroscedasticity: ${heteroscedasticity}` : '',
         outliers_count > 0 ? `Number of Removed Outliers: ${outliers_count}` : '',
+        sampleSize > 0 ? `Sample Size: ${sampleSize}` : '',
     ].filter(Boolean).join(' , ');
 
     const footerXPos = doc.internal.pageSize.getWidth() / 2;
@@ -109,6 +110,7 @@ const CustomTable = ({ data = [], filterData, title, itemsPerPage, headers, mse,
             <span style={{ marginRight: 20 }}><strong>Heteroscedasticity</strong>:{heteroscedasticity}</span>
           </span>)}
           {outliers_count > 0 && <span><strong>Number of Removed Outliers</strong>: {outliers_count}</span>}
+          {title==='Summary Statistics' && <span style={{ marginRight: 20 }}><strong>Number of Observations</strong>: {sampleSize}</span>}
         </Box>
       </Paper>
       <Paper elevation={3} style={{ width: '95%', overflowX: 'auto' }}>

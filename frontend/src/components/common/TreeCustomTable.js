@@ -36,22 +36,22 @@ const TreeCustomTable = ({ response, title, type }) => {
     yPosition += titlePadding;
     const headersData = [["Feature", "Importance"]];
     const tableData = feature_importance.map(row => [row.feature, row.importance]);
-
+    console.log(headersData, 'dddd', tableData)
     doc.autoTable({
-        head: headersData,
-        body: tableData,
-        startY: yPosition,
-        margin: { top: yPosition + 5 },
-        styles: { overflow: 'linebreak', fontSize: fontSize, cellPadding: 3, halign: 'center', valign: 'middle', fillColor: '#ffffff', textColor: '#000000' },
-        didDrawPage: function (data) {
-            const tableHorizontalPos = (doc.internal.pageSize.width - data.table.width) / 2;
-            doc.autoTable.previous.finalY = data.cursor.y;
-            data.table.x = tableHorizontalPos;
-        }
+      head: headersData,
+      body: tableData,
+      startY: yPosition,
+      margin: { top: yPosition + 5 },
+      styles: { overflow: 'linebreak', fontSize: fontSize, cellPadding: 3, halign: 'center', valign: 'middle', fillColor: '#ffffff', textColor: '#000000' },
+      didDrawPage: function (data) {
+        const tableHorizontalPos = (doc.internal.pageSize.width - data.table.width) / 2;
+        // doc.autoTable.previous.finalY = data.cursor.y;
+        data.table.x = tableHorizontalPos;
+      }
     });
 
     doc.save('report.pdf');
-};
+  };
 
 
 
@@ -63,11 +63,11 @@ const TreeCustomTable = ({ response, title, type }) => {
           {title && capitalizeFirstLetter(title)}
         </Typography>
         <Box sx={{ display: 'flex', justifyContent: 'right' }}>
-        <Button onClick={exportToPDF} variant="contained" color="primary">Download</Button>
-      </Box>
+          <Button onClick={exportToPDF} variant="contained" color="primary">Download</Button>
+        </Box>
         <Box>
           <span style={{ marginRight: 20 }}><strong>MSE</strong>: {mse}</span>
-         { type !== "time-serious"? <span><strong>Outliers Count</strong>: {outliers_count}</span>:null}
+          {type !== "time-series" ? <span><strong>Outliers Count</strong>: {outliers_count}</span> : null}
         </Box>
       </Paper>
       <Paper elevation={3} style={{ width: '95%', overflowX: 'auto', margin: 'auto' }}>

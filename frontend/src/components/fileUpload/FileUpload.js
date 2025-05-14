@@ -45,7 +45,7 @@ const ButtonSpacer = styled(Box)(({ theme }) => ({
 const mlMethods1 = ['OLS', 'GLS', 'LASSO', 'RIDGE', 'ARIMA'];
 const mlMethods2 = ['BOOSTING', 'BAGGING', 'RANDOM-FOREST', 'NEURAL_NETWORK'];
 const mlMethods = [...mlMethods1, ...mlMethods2];
-const types = ['time-serious', 'cross-sectional', 'panel']
+const types = ['time-series', 'cross-sectional', 'panel']
 
 const initialState = {
   data: [],
@@ -57,6 +57,7 @@ const initialState = {
   id: '',
   y: '',
   x: [],
+  exogenous:[],
   c: [],
   mse: '',
   multicollinearity: 0,
@@ -76,7 +77,8 @@ const initialState = {
   stationary: [],
   adf: null,
   predictionResult_withoutDiff:[],
-  mse_withoutDiff: ''
+  mse_withoutDiff: '',
+  sampleSize:null,
 };
 
 
@@ -109,26 +111,30 @@ const FileUpload = () => {
     const parsedData = await parseCSVFile(file);
     saveToIndexedDB(parsedData);
   };
-
   const parseCSVFile = (file) => {
     return new Promise((resolve) => {
       Papa.parse(file, {
         complete: (result) => {
           const parsedData = result.data || [];
-          const filteredData = parsedData.length > 0 && parsedData
+          const filteredData = parsedData.length > 0 ? parsedData : [];
+          
+          const dependentVariable = filteredData.length > 0 ? Object.keys(filteredData[0]) : [];
+          const independentVariables = filteredData.length > 0 ? Object.keys(filteredData[0]) : [];
+  
           setState((prevState) => ({
             ...prevState,
             data: filteredData,
-            dependentVariable: Object.keys(filteredData[0]) || [],
-            independentVariables: Object.keys(filteredData[0]) || [],
+            dependentVariable: dependentVariable,
+            independentVariables: independentVariables,
           }));
-
+  
           resolve(filteredData);
         },
         header: true,
       });
     });
   };
+  
 
   useEffect(() => {
     const fetchDataFromIndexedDB = async () => {
@@ -164,7 +170,7 @@ const FileUpload = () => {
 
 
   const determineStationaryValue = (state, response) => {
-    if (state.type === 'time-serious'
+    if (state.type === 'time-series'
       && response.data.hasOwnProperty('stationary')
       && !response.data.stationary) {
       if (!state.stationary.includes(state.x[0])) {
@@ -182,7 +188,7 @@ const FileUpload = () => {
       setIsLoading(false);
       return;
     }
-    if (state.type !== 'time-serious' && !state.id) {
+    if (state.type !== 'time-series' && !state.id) {
       alert('Select an ID. It is required field for non-time serious prediction');
       setIsLoading(false);
       return;
@@ -201,8 +207,13 @@ const FileUpload = () => {
     });
     const selectedData = filteredData.map((row) => {
       let rowData = {};
-      if (state.type === 'time-serious') {
+      if (state.type === 'time-series') {
         rowData[state.dateName] = row[state.dateName]
+        if(state.exogenous.length>0){
+          state.exogenous.forEach((variable) => {
+            rowData[variable] = row[variable];
+          });
+        }
       } else {
         rowData[state.id] = row[state.id]
         rowData[state.y] = row[state.y]
@@ -218,7 +229,7 @@ const FileUpload = () => {
       return Object.values(rowData).every(value => value !== undefined && value !== null && value !== '');
     });
 
-    const data = { data: nonEmptySelectedData, categorical: state.c, outliers: state.outliers, type: state.type };
+    const data = { data: nonEmptySelectedData, categorical: state.c, outliers: state.outliers, type: state.type, exogenous:state.exogenous };
     setState((prevState) => ({
       ...prevState,
       showPredictResult: false,
@@ -226,7 +237,7 @@ const FileUpload = () => {
       showGraph: false
     }));
 
-    if (state.type === 'time-serious') {
+    if (state.type === 'time-series') {
       const firstRowDate = new Date(data.data[0][state.dateName]);
       if (isNaN(firstRowDate.getTime())) {
         alert('The Date variable must be in a valid date format for ARIMA model');
@@ -288,6 +299,7 @@ const FileUpload = () => {
       ...prevState,
       y: '',
       x: [],
+      exogenous:[],
       showSummaryStat: false,
       showPredictResult: false,
       showGraph: false,
@@ -347,7 +359,6 @@ const FileUpload = () => {
       };
 
       state.x.forEach((variable) => {
-        // Ignore if value is empty, undefined, or null
         if (row[variable] !== '' && row[variable] !== undefined && row[variable] !== null) {
           rowData[variable] = isNaN(parseFloat(row[variable])) ? row[variable] : parseFloat(row[variable]);
         }
@@ -412,94 +423,12 @@ const FileUpload = () => {
       summaryStatistics: summaryStatistics,
       showSummaryStat: true,
       showPredictResult: false,
-      showGraph: false
+      showGraph: false,
+      sampleSize:state.data.length
     }));
   };
 
-  // const handleSummary = () => {
-  //   const isValidCategoricals =
-  //     state.c.every((catVar) => state.x.includes(catVar)) || state.c === state.y;
-  //   if (!isValidCategoricals) {
-  //     alert(
-  //       'Not selected categorical variables are among the dependent or independent variables'
-  //     );
-  //     return;
-  //   }
-
-  //   const selectedData = state.data.map((row) => {
-  //     const rowData = {
-  //       [state.id]: row[state.id],
-  //       [state.y]: parseFloat(row[state.y]),
-  //     };
-
-  //     state.x.forEach((variable) => {
-  //       rowData[variable] = isNaN(parseFloat(row[variable])) ? row[variable] : parseFloat(row[variable]);
-  //     });
-
-  //     return rowData;
-  //   });
-
-  //   const summaryStatistics = [];
-  //   if (state.y && !state.c.includes(state.y)) {
-  //     const yValues = selectedData.map((row) => row[state.y]);
-  //     summaryStatistics.push({
-  //       field_name: state.y,
-  //       mean_or_percentages: calculateMean(yValues),
-  //       standard_deviation: calculateStd(yValues),
-  //     });
-  //   }
-
-  //   state.x
-  //     .filter((variable) => !state.c.includes(variable))
-  //     .forEach((variable) => {
-  //       const variableValues = selectedData.map((row) => row[variable]);
-  //       summaryStatistics.push({
-  //         field_name: variable,
-  //         mean_or_percentages: calculateMean(variableValues),
-  //         standard_deviation: calculateStd(variableValues),
-  //       });
-  //     });
-
-  //   state.c.forEach((variable) => {
-  //     const variableValues = selectedData.map((row) => row[variable]);
-  //     if (typeof variableValues[0] === 'string') {
-  //       const counts = calculateCountsCategorical(variableValues);
-  //       const total = variableValues.length;
-  //       const percentages = {};
-  //       Object.entries(counts).forEach(([category, count]) => {
-  //         percentages[category] = ((count / total) * 100).toFixed(3);
-  //       });
-  //       const categories = Object.keys(percentages);
-  //       categories.forEach((category) => {
-  //         summaryStatistics.push({
-  //           field_name: `${variable} - ${category}`,
-  //           mean_or_percentages: percentages[category] + '%',
-  //         });
-  //       });
-  //     } else {
-  //       const percentages = calculatePercentages(variableValues);
-  //       const categories = Object.keys(percentages);
-  //       categories.forEach((category) => {
-  //         summaryStatistics.push({
-  //           field_name: `${variable} - ${category}`,
-  //           mean_or_percentages: percentages[category] + '%',
-  //         });
-  //       });
-  //     }
-  //   });
-
-  //   console.log('Summary Statistics:', summaryStatistics);
-
-  //   setState((prevState) => ({
-  //     ...prevState,
-  //     summaryStatistics: summaryStatistics,
-  //     showSummaryStat: true,
-  //     showPredictResult: false,
-  //     showGraph: false
-  //   }));
-  // };
-
-
+  
   const calculateCounts = (values) => {
     const counts = {};
     values.forEach((value) => {
@@ -558,8 +487,7 @@ const FileUpload = () => {
   }
 
   const filterData = ['actions', 'regions', 'regions - NaN', state.dateName];
-  const dependentField = state.type === 'time-serious'? state.x[0] || '': state.y || ''
-  console.log(dependentField, 'gggggggggggggggggggg', state)
+  const dependentField = state.type === 'time-series'? state.x[0] || '': state.y || ''
   return (
     <Box
       display="flex"
@@ -614,7 +542,7 @@ const FileUpload = () => {
                   onChange={(e) => setState({ ...state, machineLearningMethod: e.target.value, showPredictResult: false })}
                   style={{ minWidth: '200px' }}
                 >
-                  {state.type === 'time-serious' ? [...mlMethods.slice(2)].map((method) => (
+                  {state.type === 'time-series' ? [...mlMethods.slice(2)].map((method) => (
                     <MenuItem key={method} value={method}>
                       {method}
                     </MenuItem>
@@ -626,7 +554,7 @@ const FileUpload = () => {
                 </Select>
               </FormControl>
 
-              {state.type !== 'time-serious' ?
+              {state.type !== 'time-series' ?
                 <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
                   <InputLabel>ID of the Data</InputLabel>
                   <Select
@@ -643,10 +571,10 @@ const FileUpload = () => {
                 </FormControl> : null}
 
               <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
-                <InputLabel>{state.type === 'time-serious' ? 'Select Date Variable' : 'dependent Variable'}</InputLabel>
+                <InputLabel>{state.type === 'time-series' ? 'Select Date Variable' : 'dependent Variable'}</InputLabel>
                 <Select
-                  value={state.type === 'time-serious' ? state.dateName : state.y}
-                  onChange={(e) => handleInputChange(state.type === 'time-serious' ? 'dateName' : 'y', e.target.value)}
+                  value={state.type === 'time-series' ? state.dateName : state.y}
+                  onChange={(e) => handleInputChange(state.type === 'time-series' ? 'dateName' : 'y', e.target.value)}
                   style={{ minWidth: '200px' }}
                 >
                   {state.dependentVariable.map((variable) => (
@@ -659,7 +587,7 @@ const FileUpload = () => {
 
 
 
-              {state.type === 'time-serious' && (
+              {state.type === 'time-series' && (
                 <>
                   <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
                     <InputLabel>Start Date</InputLabel>
@@ -692,14 +620,60 @@ const FileUpload = () => {
                   </FormControl>
                 </>
               )}
-
               <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
-                <InputLabel>{state.type === 'time-serious' ? 'Endogenous Variables' : 'Independent Variables'}</InputLabel>
+              <InputLabel>{state.type === 'time-series' ? 'Endogenous Variables' : 'Independent Variables'}</InputLabel>
+              <div style={{ overflowX: 'auto' }}>
+                <Select
+                  multiple
+                  value={state.x}
+                  onChange={(e) => handleInputChange('x', e.target.value)}
+                  style={{ minWidth: '200px' }}
+                  MenuProps={{
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'left',
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'left',
+                    },
+                    getContentAnchorEl: null,
+                    PaperProps: {
+                      style: {
+                        maxHeight: '200px',
+                      },
+                    },
+                  }}
+                  renderValue={() => (
+                    <div>
+                      {state.x.map((variable) => (
+                        <Chip
+                          key={variable}
+                          label={variable}
+                          onDelete={() => removeVariable(variable, 'x')}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                >
+                  {state.independentVariables.map((variable) => (
+                    <MenuItem key={variable} value={variable}>
+                      {variable}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </div>
+            </FormControl>
+            {state.type === 'time-series' ?
+              <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
+                <InputLabel>Exogenous Variables</InputLabel>
                 <div style={{ overflowX: 'auto' }}>
                   <Select
                     multiple
-                    value={state.x}
-                    onChange={(e) => handleInputChange('x', e.target.value)}
+                    value={state.exogenous}
+                    onChange={(e) => handleInputChange('exogenous', e.target.value)}
                     style={{ minWidth: '200px' }}
                     MenuProps={{
                       anchorOrigin: {
@@ -719,11 +693,11 @@ const FileUpload = () => {
                     }}
                     renderValue={() => (
                       <div>
-                        {state.x.map((variable) => (
+                        {state.exogenous.map((variable) => (
                           <Chip
                             key={variable}
                             label={variable}
-                            onDelete={() => removeVariable(variable, 'x')}
+                            onDelete={() => removeVariable(variable, 'exogenous')}
                             onMouseDown={(e) => e.stopPropagation()}
                           />
                         ))}
@@ -738,9 +712,9 @@ const FileUpload = () => {
                     ))}
                   </Select>
                 </div>
-              </FormControl>
+              </FormControl>:null}
 
-              {state.type !== 'time-serious' &&
+              {state.type !== 'time-series' &&
                 <>
                   <FormControl style={{ marginLeft: '16px', marginTop: "16px" }}>
                     <InputLabel>Categorical Variables</InputLabel>
@@ -821,7 +795,7 @@ const FileUpload = () => {
             Summary Statistics
           </Button>
           <ButtonSpacer />
-          {state.type === 'time-serious' &&
+          {state.type === 'time-series' &&
             <>
               <Button
                 variant="contained"
@@ -891,13 +865,14 @@ const FileUpload = () => {
             data={state.predictionResult}
             mse={state.mse}
             filterData={filterData}
-            title={state.predictionResult_withoutDiff.length>0 ? dependentField + ' ' + state.machineLearningMethod + ' Results By Making a Difference': dependentField + ' ' +  state.machineLearningMethod + ' Results'}
+            title={state.predictionResult_withoutDiff.length>0 ? dependentField + ' ' + state.machineLearningMethod + ' Results By Applying Differencing': dependentField + ' ' +  state.machineLearningMethod + ' Results'}
             itemsPerPage={25}
             headers={!['LASSO', 'RIDGE'].includes(state.machineLearningMethod) ? ['field_name', 'mean', 'standard_error', 'p_value'] : ['field_name', 'mean']}
             heteroscedasticity={state.heteroscedasticity}
             multicollinearity={state.multicollinearity}
             outliers_count={state.outliers_count}
             R2={state.R2}
+            adf={state.adf}
           />
         </Box>
       )}
@@ -917,7 +892,7 @@ const FileUpload = () => {
             data={state.predictionResult_withoutDiff}
             mse={state.mse_withoutDiff}
             filterData={filterData}
-            title={dependentField + ' ' + state.machineLearningMethod + ' Results Without Making a Difference'}
+            title={dependentField + ' ' + state.machineLearningMethod + ' Results Without Applying Differencing'}
             itemsPerPage={25}
             headers={!['LASSO', 'RIDGE'].includes(state.machineLearningMethod) ? ['field_name', 'mean', 'standard_error', 'p_value'] : ['field_name', 'mean']}
             heteroscedasticity={state.heteroscedasticity}
@@ -944,6 +919,7 @@ const FileUpload = () => {
             filterData={filterData}
             title={'Summary Statistics'}
             itemsPerPage={25}
+            sampleSize ={state.sampleSize}
             headers={['field_name', 'mean_or_percentages', 'standard_deviation']}
           />
         </Box>
